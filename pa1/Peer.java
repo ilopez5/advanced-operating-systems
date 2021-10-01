@@ -29,7 +29,7 @@ public class Peer extends Thread {
             System.out.println(String.format("(peer %d): Listening on %s:%d...", 
                         this.peerID, this.address, this.port));
             this.server.accept();
-            // TODO:
+            // TODO: spin up a thread to listen, then do other stuff
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
