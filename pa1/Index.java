@@ -25,7 +25,7 @@ public class Index {
     public static void main(String[] args) {
         // constructs a new Index object
         Index index = new Index();
-        System.out.println(String.format("Listening on 127.0.0.1:%d...", index.server.getLocalPort()));
+        System.out.println(String.format("[Index]: Listening on 127.0.0.1:%d...", index.server.getLocalPort()));
         index.listen();
     }
 
@@ -48,19 +48,20 @@ public class Index {
      *              in the registry, it is added with 'peerID' as its only
      *              peer. Else, 'peerID' is added to the existing peer list.
      */
-    // public void registry(int peerID, String fileName) {
-    //     // check if this file has been registered before
-    //     if (this.registry.containsKey(fileName)) {
-    //         HashSet<Integer> filePeerList = this.registry.get(fileName);
-    //         filePeerList.add(peerID);
-    //     } else {
-    //         // has not been registered, creating a new entry and adding peerID to it
-    //         HashSet<Integer> filePeerList = new HashSet<Integer>();
-    //         filePeerList.add(peerID);
-    //         this.registry.put(fileName, filePeerList);
-    //     }
-    //     System.out.println(String.format("(index %d): registered %s to peer %d", this.indexID, fileName, peerID));
-    // }
+    public void register(String fileName, FileMetadata fileMeta) {
+        // check if this file has been registered before
+        if (this.registry.containsKey(fileName)) {
+            // it exists, acquire its known peer list and add this peer to it
+            HashSet<FileMetadata> filePeerList = this.registry.get(fileName);
+            filePeerList.add(fileMeta);
+        } else {
+            // does not exist, create a new entry with this peer associated to it
+            HashSet<FileMetadata> filePeerList = new HashSet<FileMetadata>();
+            filePeerList.add(fileMeta);
+            this.registry.put(fileName, filePeerList);
+        }
+        System.out.println(String.format("[Index]: Registered %s to Peer %d", fileName, fileMeta.getPeerID()));
+    }
 
     // /*
     //  *  search - Checks the registry for 'fileName'. If registry contains
@@ -121,16 +122,35 @@ public class Index {
                 // first task: get peer id and address/port
                 this.peerID = dataIn.readInt();
                 this.peerServerPort = dataIn.readInt();
-                System.out.print(String.format("(index) registered peer %d at 127.0.0.1:%d", this.peerID, this.peerServerPort));
+                System.out.print(String.format("[Index]: Registered Peer %d at 127.0.0.1:%d.", this.peerID, this.peerServerPort));
 
                 // parse a command from peer
                 while (true) {
-                    // take any command and deal with it accordingly
+                    // receive a command in the form of "command fileName"
+                    //      e.g., "register Moana.txt"
+                    String[] request = dataIn.readUTF().split("\s");
+                    String command = request[0];
+                    String fileName = request[1];
+                    System.out.println(String.format("[Index]: Peer %d -> %s %s.", this.peerID, command, fileName));
+
+                    // handle command appropriately
+                    switch (command) {
+                        case "register":
+                            register(fileName, new FileMetadata(this.peerID, this.peerServerPort));
+                            break;
+                        case "search":
+                            break;
+                        case "deregister":
+                            break;
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+
             }
         }
     }
 }
 // code adopted from https://www.geeksforgeeks.org/multithreaded-servers-in-java/
+// https://stackoverflow.com/questions/3154488/how-do-i-iterate-through-the-files-in-a-directory-in-java

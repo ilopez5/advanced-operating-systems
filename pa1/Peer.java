@@ -27,10 +27,10 @@ public class Peer {
     public static void main(String[] args) {
         // parse program arguments ugly
         int peerID = Integer.parseInt(args[0]);
-        String fileDir = args[1];
+        File fileDir = new File(args[1]);
         int indexPort = Integer.parseInt(args[2]);
         // init an object of this very class
-        Peer peer = new Peer(peerID, new File(fileDir), indexPort);
+        Peer peer = new Peer(peerID, fileDir, indexPort);
 
         try {
             // PeerListener is a secretary for handling any requests made by other peers
@@ -47,19 +47,28 @@ public class Peer {
             dataOut.writeInt(peerID);
             dataOut.writeInt(peer.server.getLocalPort());
 
-            // TODO: second task: register all my files with Index
-            // iterate through files in fileDirectory
-            // register fileName with index using dataOut
+            // second task: register all my files with Index
+            File[] files = fileDir.listFiles();
+            for  (File file : files) {
+                if (file.isFile()) {
+                    // register file with Index server
+                    System.out.println(String.format("[Peer %d]: registering file '%s'", peerID, file.getName()));
+                    dataOut.writeUTF(String.format("register %s", file.getName()));
+                    // TODO: should I catch a response?
+                }
+            }
 
             // TODO: implement user interface (while should end on user input "exit" or something)
-            while (true) {
-                // read in from std in
-                // parse what the command is
-                // send appropriately to Index server using dataOut
-                // receive/handle/print response
-            }
+            // while (true) {
+            //     // read in from std in
+            //     // parse what the command is
+            //     // send appropriately to Index server using dataOut
+            //     // receive/handle/print response
+            // }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            // indexSocket.close();
         }
     }
 
