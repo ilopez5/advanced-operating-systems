@@ -1,10 +1,7 @@
 JC = javac
 
 all:
-	$(JC) Peer.java Index.java Demo.java
-
-run: all
-	@java Demo
+	$(JC) Index.java Peer.java
 
 clean:
 	rm -rf *.class

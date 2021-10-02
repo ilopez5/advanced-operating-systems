@@ -2,34 +2,94 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 
-public class Peer extends Thread {
+public class Peer {
     /* peer metadata */
     private int peerID;
-    private String address = "127.0.0.1";
-    private int port = 5001;
-    private ServerSocket server = null;
+    private ServerSocket server;
+    private File fileDirectory;
+    private int indexPort;
 
     /* peer constructor */
-    public Peer(int peerID, String address, int port) {
-        this.peerID  = peerID;
-        this.address = address;
-        this.port    = port;
+    public Peer(int peerID, File fileDirectory, int indexPort) {
+        this.peerID = peerID;
+        this.fileDirectory = fileDirectory;
+        this.indexPort = indexPort;
 
         try {
-            this.server = new ServerSocket(port);
+            this.server = new ServerSocket(0);
             this.server.setReuseAddress(true);
+            System.out.println(String.format("(Peer %d) Listening at 127.0.0.1:%d", this.peerID, this.server.getLocalPort()));
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    /* runs as a thread when .start() is called */
+    public static void main(String[] args) {
+        // parse program arguments ugly
+        int peerID = Integer.parseInt(args[0]);
+        String fileDir = args[1];
+        int indexPort = Integer.parseInt(args[2]);
+        // init an object of this very class
+        Peer peer = new Peer(peerID, new File(fileDir), indexPort);
+
+        try {
+            // PeerListener is a secretary for handling any requests made by other peers
+            PeerListener pl = new PeerListener(peer.server, peer.fileDirectory);
+            pl.start();
+
+            Socket indexSocket = new Socket("127.0.0.1", indexPort);
+            // dataIn is for messages received FROM THE INDEX
+            // dataOut is for requests we send TO THE INDEX
+            DataInputStream dataIn = new DataInputStream(indexSocket.getInputStream());
+            DataOutputStream dataOut = new DataOutputStream(indexSocket.getOutputStream());
+
+            // first task: register my peer ID and (server) port number to Index server
+            dataOut.writeInt(peerID);
+            dataOut.writeInt(peer.server.getLocalPort());
+
+            // TODO: second task: register all my files with Index
+            // iterate through files in fileDirectory
+            // register fileName with index using dataOut
+
+            // TODO: implement user interface (while should end on user input "exit" or something)
+            while (true) {
+                // read in from std in
+                // parse what the command is
+                // send appropriately to Index server using dataOut
+                // receive/handle/print response
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /*
+     *  retrieve - Given a 'fileName', will return/download that file to caller
+     *              using a Stream Buffer.
+     */
+    public void retrieve (String fileName) {
+        System.out.println(String.format("(Peer %d): Received request for file %s", this.peerID, fileName));
+    }
+}
+
+class PeerListener extends Thread {
+    private ServerSocket server;
+    private File fileDirectory;
+
+    /* peer constructor */
+    public PeerListener(ServerSocket server, File fileDirectory) {
+        this.server = server;
+        this.fileDirectory = fileDirectory;
+    }
+
     public void run() {
         try {
-            System.out.println(String.format("(peer %d): Listening on %s:%d...",
-                        this.peerID, this.address, this.port));
-            this.server.accept();
-            // TODO: spin up a thread to listen, then do other stuff
+            while (true) {
+                // accept an incoming connection from greedy hobbitses
+                Socket peerToPeerSocket = this.server.accept();
+                PeerHandler requestor = new PeerHandler(peerToPeerSocket, this.fileDirectory);
+                requestor.start();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -41,27 +101,27 @@ public class Peer extends Thread {
                 }
             }
         }
+    }
+}
 
+/* deals with sending/receiving a message from peers */
+class PeerHandler extends Thread {
+    private Socket peerSocket;
+    private File fileDirectory;
+
+    // constructor
+    public PeerHandler(Socket socket, File fileDirectory) {
+        this.peerSocket = socket;
+        this.fileDirectory = fileDirectory;
     }
 
-    /* getters */
-    public int getPeerID() {
-        return this.peerID;
-    }
-
-    public String getAddress() {
-        return this.address;
-    }
-
-    public int getPort() {
-        return this.port;
-    }
-
-    /*
-     *  retrieve - Given a 'fileName', will return/download that file to caller
-     *              using a Stream Buffer.
-     */
-    public void retrieve (String fileName) {
-        System.out.println(String.format("(peer %d): Received request for file %s", this.peerID, fileName));
+    public void run() {
+        try {
+            // receive msg
+            // parse it
+            // handle it
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
