@@ -18,7 +18,7 @@ public class Peer {
         try {
             this.server = new ServerSocket(0);
             this.server.setReuseAddress(true);
-            System.out.println(String.format("(Peer %d) Listening at 127.0.0.1:%d", this.peerID, this.server.getLocalPort()));
+            System.out.println(String.format("[Peer %d]: Listening at 127.0.0.1:%d", this.peerID, this.server.getLocalPort()));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -44,27 +44,36 @@ public class Peer {
             DataOutputStream dataOut = new DataOutputStream(indexSocket.getOutputStream());
 
             // first task: register my peer ID and (server) port number to Index server
-            dataOut.writeInt(peerID);
+            dataOut.writeInt(peer.peerID);
             dataOut.writeInt(peer.server.getLocalPort());
 
             // second task: register all my files with Index
             File[] files = fileDir.listFiles();
-            for  (File file : files) {
+            for (File file : files) {
                 if (file.isFile()) {
                     // register file with Index server
-                    System.out.println(String.format("[Peer %d]: registering file '%s'", peerID, file.getName()));
+                    System.out.println(String.format("[Peer %d]: Registering file '%s'", peer.peerID, file.getName()));
                     dataOut.writeUTF(String.format("register %s", file.getName()));
-                    // TODO: should I catch a response?
                 }
             }
 
-            // TODO: implement user interface (while should end on user input "exit" or something)
-            // while (true) {
-            //     // read in from std in
-            //     // parse what the command is
-            //     // send appropriately to Index server using dataOut
-            //     // receive/handle/print response
-            // }
+            // user CLI
+            Scanner sc = new Scanner(System.in);
+            String line = null;
+
+            while (!"exit".equalsIgnoreCase(line)) {
+                System.out.print("(p2p) :: ");
+                // read input from user
+                line = sc.nextLine();
+
+                // sending the user input to server
+                dataOut.writeUTF(line);
+                String response = dataIn.readUTF();
+                System.out.println(String.format("[Peer %d] Received '%s' from Index.", peer.peerID, response));
+            }
+
+            // closing the scanner object
+            sc.close();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -77,7 +86,7 @@ public class Peer {
      *              using a Stream Buffer.
      */
     public void retrieve (String fileName) {
-        System.out.println(String.format("(Peer %d): Received request for file %s", this.peerID, fileName));
+        System.out.println(String.format("[Peer %d]: Received request for file %s", this.peerID, fileName));
     }
 }
 
@@ -96,8 +105,8 @@ class PeerListener extends Thread {
             while (true) {
                 // accept an incoming connection from greedy hobbitses
                 Socket peerToPeerSocket = this.server.accept();
-                PeerHandler requestor = new PeerHandler(peerToPeerSocket, this.fileDirectory);
-                requestor.start();
+                PeerHandler requester = new PeerHandler(peerToPeerSocket, this.fileDirectory);
+                requester.start();
             }
         } catch (Exception e) {
             e.printStackTrace();
