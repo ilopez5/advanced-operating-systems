@@ -26,7 +26,7 @@ public class Peer extends Thread {
     /* runs as a thread when .start() is called */
     public void run() {
         try {
-            System.out.println(String.format("(peer %d): Listening on %s:%d...", 
+            System.out.println(String.format("(peer %d): Listening on %s:%d...",
                         this.peerID, this.address, this.port));
             this.server.accept();
             // TODO: spin up a thread to listen, then do other stuff
@@ -41,14 +41,14 @@ public class Peer extends Thread {
                 }
             }
         }
-        
+
     }
 
     /* getters */
     public int getPeerID() {
         return this.peerID;
     }
-    
+
     public String getAddress() {
         return this.address;
     }
@@ -58,7 +58,8 @@ public class Peer extends Thread {
     }
 
     /*
-     *  retrieve - given a file name, will return/download that file to caller
+     *  retrieve - Given a 'fileName', will return/download that file to caller
+     *              using a Stream Buffer.
      */
     public void retrieve (String fileName) {
         System.out.println(String.format("(peer %d): Received request for file %s", this.peerID, fileName));
