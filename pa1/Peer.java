@@ -16,7 +16,6 @@ public class Peer {
         this.peerID = peerID;
         this.fileDirectory = fileDirectory;
         this.indexPort = indexPort;
-
         try {
             this.server = new ServerSocket(0);
             this.server.setReuseAddress(true);
@@ -45,10 +44,10 @@ public class Peer {
             peer.dataIn = new DataInputStream(indexSocket.getInputStream());
             peer.dataOut = new DataOutputStream(indexSocket.getOutputStream());
 
-            // first task: register my peer ID and (server) port number to Index server
+            // egister my peerID, (server) port, and files to Index server
             peer.register();
 
-            // user CLI
+            // User CLI - runs until program is interrupted or 'exit' is entered
             Scanner sc = new Scanner(System.in);
             String line = null;
 
@@ -80,10 +79,17 @@ public class Peer {
                     // capture response
                     String response = peer.dataIn.readUTF();
 
+                    int rc;
                     switch (command) {
                         case "register":
                         case "deregister":
-                            // we dont care about response (for now)
+                            // for now, we just check response code and print if
+                            // there is an error. future work might have more
+                            // attempts being made.
+                            rc = peer.dataIn.readInt();
+                            if (rc > 0) {
+                                System.out.println(String.format("[Peer %d]: Received error code %d", peer.peerID, rc));
+                            }
                             break;
                         case "search":
                             String[] peerList = response.substring(1, response.length()-1).split(", ");
@@ -96,6 +102,7 @@ public class Peer {
 
                                 // make contact
                                 targetOut.writeUTF(String.format("retrieve %s", fileName));
+                                // TODO: what is response format?
                             }
 
                             break;
@@ -143,11 +150,25 @@ public class Peer {
      *              using a Stream Buffer.
      */
     public void retrieve (String fileName) {
+
         System.out.println(String.format("[Peer %d]: Received request for file %s", this.peerID, fileName));
     }
 
-    class PeerListener extends Thread {
-        // reference to the peer this listener works for
+    /**
+     *  Nested Classes:
+     *
+     *      PeerListener - This listens on a ServerSocket port and accepts requests
+     *                  from peers. On receiving an incoming request, spins up
+     *                  a PeerHandler thread to parse and execute these requests.
+     *
+     *      PeerHandler - This handles the requests for each peer that communicates
+     *                  with it. In practice, there is one PeerHandler for every
+     *                  peer that communicates with this peer server. This does
+     *                  not scale but works for the purposes of this assignment.
+     *                  Future work for sure.
+     */
+    private class PeerListener extends Thread {
+        /* reference to the peer this listener works for */
         private Peer peer;
 
         /* constructor */
@@ -160,19 +181,53 @@ public class Peer {
                 while (true) {
                     // accept an incoming connection from other peers
                     Socket peerSocket = this.peer.server.accept();
-                    PeerHandler ph = new PeerHandler(peerSocket, this.peer.fileDirectory);
+                    PeerHandler ph = new PeerHandler(peerSocket, this.peer);
                     ph.start();
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
-                if (this.peer.server != null) {
-                    try {
-                        this.peer.server.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
+            }
+        }
+    }
+
+    private class PeerHandler extends Thread {
+        /* reference to peer, and to the socket of the connecting peer */
+        private Socket peerSocket;
+        private Peer peer;
+
+        /* constructor */
+        public PeerHandler(Socket socket, Peer peer) {
+            this.peerSocket = socket;
+            this.peer = peer;
+        }
+
+        public void run() {
+            try {
+                while (true) {
+                    // open input/output streams for communication
+                    DataInputStream dataIn = new DataInputStream(this.peerSocket.getInputStream());
+                    DataOutputStream dataOut = new DataOutputStream(this.peerSocket.getOutputStream());
+
+                    // receive peer request and parse
+                    String[] request = dataIn.readUTF().split("[ \t]+");
+                    String command = request[0];
+                    String fileName = request[1];
+
+                    // handle request (only 'retrieve' for now)
+                    switch (command) {
+                        case "retrieve":
+                            this.peer.retrieve(fileName);
+                            break;
+                        default:
+                            System.out.println(String.format("[Peer %d]: Received unknown command '%s'. Ignoring.", peer.peerID, command));
+                            // dataOut.writeUTF("error: unknown command");
+                            break;
                     }
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
             }
         }
     }
@@ -180,24 +235,3 @@ public class Peer {
 
 
 
-/* deals with sending/receiving a message from peers */
-class PeerHandler extends Thread {
-    private Socket peerSocket;
-    private File fileDirectory;
-
-    // constructor
-    public PeerHandler(Socket socket, File fileDirectory) {
-        this.peerSocket = socket;
-        this.fileDirectory = fileDirectory;
-    }
-
-    public void run() {
-        try {
-            // receive msg
-            // parse it
-            // handle it
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}

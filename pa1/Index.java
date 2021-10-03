@@ -3,6 +3,15 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 
+/**
+ *  Index - this class runs and maintains an in-memory registry that links
+ *          files to the peers that contain them. Additionally, this class offers
+ *          an API for which peers can register new files, deregister old ones,
+ *          and search for files.
+ *          These communications occur over TCP using Sockets. Thus, most
+ *          communications are simply UTF string messages being passed back and
+ *          forth.
+ */
 public class Index {
     /* index metadata */
     private ServerSocket server;
@@ -53,19 +62,25 @@ public class Index {
      *              in the registry, it is added with 'peerID' as its only
      *              peer. Else, 'peerID' is added to the existing peer list.
      */
-    public void register(String fileName, PeerMetadata fileMeta) {
-        // check if this file has been registered before
-        if (this.registry.containsKey(fileName)) {
-            // it exists, acquire its known peer list and add this peer to it
-            HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
-            filePeerList.add(fileMeta);
-        } else {
-            // does not exist, create a new entry with this peer associated to it
-            HashSet<PeerMetadata> filePeerList = new HashSet<PeerMetadata>();
-            filePeerList.add(fileMeta);
-            this.registry.put(fileName, filePeerList);
+    public int register(String fileName, PeerMetadata fileMeta) {
+        try {
+            // check if this file has been registered before
+            if (this.registry.containsKey(fileName)) {
+                // it exists, acquire its known peer list and add this peer to it
+                HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
+                filePeerList.add(fileMeta);
+            } else {
+                // does not exist, create a new entry with this peer associated to it
+                HashSet<PeerMetadata> filePeerList = new HashSet<PeerMetadata>();
+                filePeerList.add(fileMeta);
+                this.registry.put(fileName, filePeerList);
+            }
+            System.out.println(String.format("[Index]: Registered '%s' to Peer %d", fileName, fileMeta.getID()));
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 1;
         }
-        System.out.println(String.format("[Index]: Registered '%s' to Peer %d", fileName, fileMeta.getID()));
     }
 
     /*
@@ -90,27 +105,41 @@ public class Index {
      *              the peer list associated with 'fileName'. If the peer list
      *              becomes empty, remove 'fileName' from the registry altogether.
      */
-    public void deregister(String fileName, PeerMetadata peer) {
-        // only do work if file is registered
-        if (this.registry.containsKey(fileName)) {
-            HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
-            filePeerList.remove(peer);
-            System.out.println(String.format("[Index]: Deregistered Peer %d from '%s'.", peer.getID(), fileName));
-            if (filePeerList.size() == 0) {
-                // last peer removed from file's peer list, remove file from registry
-                this.registry.remove(fileName);
-                System.out.println(String.format("[Index]: Deregistered '%s' entirely from Registry.", fileName));
+    public int deregister(String fileName, PeerMetadata peer) {
+        try {
+            // only do work if file is registered
+            if (this.registry.containsKey(fileName)) {
+                HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
+                filePeerList.remove(peer);
+                System.out.println(String.format("[Index]: Deregistered Peer %d from '%s'.", peer.getID(), fileName));
+                if (filePeerList.size() == 0) {
+                    // last peer removed from file's peer list, remove file from registry
+                    this.registry.remove(fileName);
+                    System.out.println(String.format("[Index]: Deregistered '%s' entirely from Registry.", fileName));
+                }
             }
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 1;
         }
     }
 
-    /* deals with sending/receiving a message from peers */
+    /**
+     *  Nested Class(es):
+     *
+     *      IndexHandler - This class handles communication with an incoming
+     *                  peer request. It ruins on its own thread, receives
+     *                  the request over TCP, parses it, executes it, and
+     *                  returns a response (if necessary).
+     */
     private static class IndexHandler extends Thread {
+        /* references to this peer and the socket for the incoming peer */
         private Index index;
         private Socket peerSocket; // used for the index to communicate with it
-        private PeerMetadata peer; // contains peer ID and peerServerPort
+        private PeerMetadata peer; // contains peerID and peerServerPort
 
-        // constructor
+        /* constructor */
         public IndexHandler(Index index, Socket socket) {
             this.index = index;
             this.peerSocket = socket;
@@ -133,33 +162,33 @@ public class Index {
                     // receive a command in the form of "command fileName"
                     //      e.g., "register Moana.txt"
                     String[] request = dataIn.readUTF().split("[ \t]+");
-                    if (request.length == 0) {
-                        break;
-                    }
-                    String command = request[0];
-                    String fileName = request[1];
+                    if (request.length > 0) {
+                        String command = request[0];
+                        String fileName = request[1];
 
-                    // handle command appropriately
-                    switch (command) {
-                        case "register":
-                            this.index.register(fileName, this.peer);
-                            break;
-                        case "search":
-                            HashSet<PeerMetadata> peerList = this.index.search(fileName);
-                            dataOut.writeUTF(peerList.toString());
-                            break;
-                        case "deregister":
-                            this.index.deregister(fileName, this.peer);
-                            break;
-                        default:
-                            System.out.println(String.format("[Index]: Received unknown command '%s'. Ignoring.", command));
-                            break;
+                        // handle command appropriately
+                        int rc;
+                        switch (command) {
+                            case "register":
+                                rc = this.index.register(fileName, this.peer);
+                                dataOut.writeInt(rc);
+                                break;
+                            case "search":
+                                dataOut.writeUTF(this.index.search(fileName).toString());
+                                break;
+                            case "deregister":
+                                rc = this.index.deregister(fileName, this.peer);
+                                dataOut.writeInt(rc);
+                                break;
+                            default:
+                                System.out.println(String.format("[Index]: Received unknown command '%s'. Ignoring.", command));
+                                break;
+                        }
                     }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
-                // close sockets probably
             }
         }
     }

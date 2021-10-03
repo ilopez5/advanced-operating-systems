@@ -1,3 +1,9 @@
+/**
+ *  PeerMetadata - this class encapsulates peer-related metadata such as a
+ *                  peer's id and server port. Wrapping such metadata into a
+ *                  class helps in case the functionality of this network grows
+ *                  and peers gain more information, avoiding much code rework.
+ */
 public class PeerMetadata {
     /* metadata */
     private int peerID;
@@ -18,6 +24,7 @@ public class PeerMetadata {
         return this.peerServerPort;
     }
 
+    /* helper functions for serializing and deserializing objects of this class */
     public String toString() {
         return String.format("(%d:%d)", this.peerID, this.peerServerPort);
     }
