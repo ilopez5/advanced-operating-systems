@@ -12,7 +12,6 @@ public class Index {
     public Index() {
         // initialize index metadata
         this.registry = new ConcurrentHashMap<String, HashSet<PeerMetadata>>();
-
         try {
             // create new socket for connections
             this.server = new ServerSocket(0);

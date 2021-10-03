@@ -19,6 +19,13 @@ public class PeerMetadata {
     }
 
     public String toString() {
-        return String.format("(%d, %d)", this.peerID, this.peerServerPort);
+        return String.format("(%d:%d)", this.peerID, this.peerServerPort);
+    }
+
+    public static PeerMetadata parseString(String peer) {
+        String[] components = peer.substring(1, peer.length()-1).split(":");
+        int peerID = Integer.parseInt(components[0]);
+        int peerPort = Integer.parseInt(components[1]);
+        return new PeerMetadata(peerID, peerPort);
     }
 }
