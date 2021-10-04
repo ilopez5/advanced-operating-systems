@@ -1,6 +1,12 @@
 import java.util.*;
 import java.net.*;
 import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchService;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchEvent;
 
 /**
  *  Peer - this class defines each peer which make up a P2P network. Each peer
@@ -61,14 +67,24 @@ public class Peer {
             PeerListener pl = peer.new PeerListener(peer);
             pl.start();
 
+
+            /**
+             *  EventListener section:
+             *      spawns an EventListener thread that watches for any changes
+             *      to the given directory. If new file, registers it. If a file
+             *      is deleted, deregisters it. Nothing if a file is modified (TBD)
+             */
+            EventListener el = peer.new EventListener(peer);
+            el.start();
+
+
+            // register my peer id, my (server) port, and my initial files
+            // to Index server.
             // dataIn is for messages received FROM THE INDEX
             // dataOut is for requests we send TO THE INDEX
             Socket indexSocket = new Socket("127.0.0.1", peer.indexPort);
             peer.fromIndex = new DataInputStream(indexSocket.getInputStream());
             peer.toIndex = new DataOutputStream(indexSocket.getOutputStream());
-
-            // register my peer id, my (server) port, and my initial files
-            // to Index server.
             peer.register();
 
             /**
@@ -235,6 +251,16 @@ public class Peer {
      *
      *      PeerHandler - This handles the requests for each peer that communicates
      *                  with it. Upon completion, the socket connection is closed.
+     *
+     *      EventListener - This watches the peer's file directory for any events
+     *                  where a file is created, deleted, or modified. Upon a file
+     *                  being created, it is registered with the Index. Upon a file
+     *                  being deleted, it is deregistered from the Index. Modifications
+     *                  are not within the scope of this assignment but it would
+     *                  involve 'search'-ing the Index for the Peer list, then
+     *                  updating them to the change, and possibly having each
+     *                  one of them call 'retrieve' on this peer to get the most
+     *                  up to date changes. This is an expensive operation.
      */
     private class PeerListener extends Thread {
         /* reference to the peer this listener works for */
@@ -294,6 +320,60 @@ public class Peer {
                 this.peerSocket.close();
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    private class EventListener extends Thread {
+        /* reference to the peer this listener works for */
+        private Peer peer;
+        private WatchService observer;
+
+        /* constructor */
+        public EventListener(Peer peer) {
+            this.peer = peer;
+            try {
+                // get peer directory as a Path object.
+                Path dir = Paths.get(peer.fileDirectory.toString());
+                // initialize a new watch service for this given directory.
+                this.observer = dir.getFileSystem().newWatchService();
+                // register the types of events we care about with this watch service.
+                dir.register(
+                    this.observer,
+                    StandardWatchEventKinds.ENTRY_CREATE,
+                    StandardWatchEventKinds.ENTRY_DELETE,
+                    StandardWatchEventKinds.ENTRY_MODIFY
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void run() {
+            while (true) {
+                try {
+                    // accept/take a new event
+                    WatchKey watchKey = observer.take();
+                    List<WatchEvent<?>> events = watchKey.pollEvents();
+
+                    // iterate through the events
+                    for (WatchEvent<?> event : events) {
+                        if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            // a file was deleted so we deregister
+                            this.peer.toIndex.writeUTF(String.format("deregister %s", event.context().toString()));
+                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                            // a file was created so we register it
+                            this.peer.toIndex.writeUTF(String.format("register %s", event.context().toString()));
+                        } else {
+                            // a file was just modified -> NOT YET IMPLEMENTED
+                        }
+                    }
+                    watchKey.reset();
+                } catch (SocketException e) {
+                    System.out.println("[EventListener]: Socket closed. Watch thread exiting.");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
