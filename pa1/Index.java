@@ -11,6 +11,9 @@ import java.io.*;
  *          These communications occur over TCP using Sockets. Thus, most
  *          communications are simply UTF string messages being passed back and
  *          forth.
+ *
+ *          Citations:
+ *              some code adopted from https://www.geeksforgeeks.org/multithreaded-servers-in-java/
  */
 public class Index {
     /* index metadata */
@@ -38,7 +41,8 @@ public class Index {
     }
 
     /*
-     *  listen - spawns a thread to listen to this given peer socket. This means
+     *  listen - waits for incoming connections. Upon receiving one, it spawns a
+     *          IndexHandler thread to handle this request/connection. This means
      *          there will be a thread for each peer in the P2P network. This is
      *          not scalable, but works for the purposes of this assignment, where
      *          we are running with less than 5 peers.
@@ -93,7 +97,7 @@ public class Index {
         if (this.registry.containsKey(fileName)) {
             // return HashSet of peers if yes
             HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
-            System.out.println(String.format("[Index]: Found '%s' in registry.", fileName));
+            System.out.println(String.format("[Index]: Found '%s' in registry. Returning its Peer List.", fileName));
             return filePeerList;
         }
         System.out.println(String.format("[Index]: Did not '%s' in registry.", fileName));
@@ -133,7 +137,7 @@ public class Index {
      *                  the request over TCP, parses it, executes it, and
      *                  returns a response (if necessary).
      */
-    private static class IndexHandler extends Thread {
+    private class IndexHandler extends Thread {
         /* references to this peer and the socket for the incoming peer */
         private Index index;
         private Socket peerSocket; // used for the index to communicate with it
@@ -149,11 +153,11 @@ public class Index {
             try {
                 // dataIn is for requests received FROM THE PEER
                 // dataOut is for responses we send TO THE PEER
-                DataInputStream dataIn = new DataInputStream(peerSocket.getInputStream());
-                DataOutputStream dataOut = new DataOutputStream(peerSocket.getOutputStream());
+                DataInputStream fromPeer = new DataInputStream(peerSocket.getInputStream());
+                DataOutputStream toPeer = new DataOutputStream(peerSocket.getOutputStream());
 
                 // first task: get peer id and address/port
-                this.peer = new PeerMetadata(dataIn.readInt(), dataIn.readInt());
+                this.peer = new PeerMetadata(fromPeer.readInt(), fromPeer.readInt());
                 System.out.print(String.format("[Index]: Registered Peer %d at 127.0.0.1:%d.\n",
                                 this.peer.getID(), this.peer.getServerPort()));
 
@@ -161,7 +165,7 @@ public class Index {
                 while (true) {
                     // receive a command in the form of "command fileName"
                     //      e.g., "register Moana.txt"
-                    String[] request = dataIn.readUTF().split("[ \t]+");
+                    String[] request = fromPeer.readUTF().split("[ \t]+");
                     if (request.length > 0) {
                         String command = request[0];
                         String fileName = request[1];
@@ -171,14 +175,15 @@ public class Index {
                         switch (command) {
                             case "register":
                                 rc = this.index.register(fileName, this.peer);
-                                dataOut.writeInt(rc);
+                                toPeer.writeInt(rc);
                                 break;
                             case "search":
-                                dataOut.writeUTF(this.index.search(fileName).toString());
+                                String response = this.index.search(fileName).toString();
+                                toPeer.writeUTF(response);
                                 break;
                             case "deregister":
                                 rc = this.index.deregister(fileName, this.peer);
-                                dataOut.writeInt(rc);
+                                toPeer.writeInt(rc);
                                 break;
                             default:
                                 System.out.println(String.format("[Index]: Received unknown command '%s'. Ignoring.", command));
@@ -188,10 +193,7 @@ public class Index {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-            } finally {
             }
         }
     }
 }
-// code adopted from https://www.geeksforgeeks.org/multithreaded-servers-in-java/
-// https://stackoverflow.com/questions/3154488/how-do-i-iterate-through-the-files-in-a-directory-in-java
