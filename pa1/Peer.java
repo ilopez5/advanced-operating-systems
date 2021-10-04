@@ -23,7 +23,10 @@ import java.nio.file.WatchEvent;
  *              (p2p) :: search Inception.txt
  *
  *          Citations:
- *              some code adopted from https://stackoverflow.com/questions/3154488/how-do-i-iterate-through-the-files-in-a-directory-in-java
+ *              [1] https://www.geeksforgeeks.org/socket-programming-in-java/
+ *              [2] https://www.geeksforgeeks.org/multithreaded-servers-in-java/
+ *              [3] https://stackoverflow.com/questions/3154488/how-do-i-iterate-through-the-files-in-a-directory-in-java
+ *              [4] https://www.rgagnon.com/javadetails/java-detect-file-modification-event.html
  */
 public class Peer {
     /* peer metadata */
@@ -361,9 +364,11 @@ public class Peer {
                         if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             // a file was deleted so we deregister
                             this.peer.toIndex.writeUTF(String.format("deregister %s", event.context().toString()));
+                            this.peer.fromIndex.readInt();
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
                             // a file was created so we register it
                             this.peer.toIndex.writeUTF(String.format("register %s", event.context().toString()));
+                            this.peer.fromIndex.readInt();
                         } else {
                             // a file was just modified -> NOT YET IMPLEMENTED
                         }
