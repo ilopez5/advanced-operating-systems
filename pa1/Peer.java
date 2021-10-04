@@ -7,6 +7,8 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchService;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchEvent;
+import java.time.Duration;
+import java.time.Instant;
 
 /**
  *  Peer - this class defines each peer which make up a P2P network. Each peer
@@ -97,6 +99,8 @@ public class Peer {
             Scanner sc = new Scanner(System.in);
             String line = null;
             int rc;
+            Instant start, end;
+            Duration timeElapsed;
 
             while (!"exit".equalsIgnoreCase(line)) {
                 // print a prompt to the user, then read input
@@ -115,8 +119,12 @@ public class Peer {
                         case "register":
                         case "deregister":
                             // send command to Index
+                            start = Instant.now();
                             peer.toIndex.writeUTF(line);
                             rc = peer.fromIndex.readInt();
+                            end = Instant.now();
+                            timeElapsed = Duration.between(start, end);
+                            System.out.println(String.format("[Peer %d]: '%s' took %s", peer.peerID, command, peer.pretty(timeElapsed)));
                             if (rc > 0) {
                                 System.out.println(String.format("[Peer %d]: Received error code %d", peer.peerID, rc));
                             }
@@ -131,48 +139,58 @@ public class Peer {
 
                             // send command to Index, receive response which should
                             // be a serialized list of PeerMetadata objects.
+                            start = Instant.now();
                             peer.toIndex.writeUTF(line);
                             String response = peer.fromIndex.readUTF();
+                            end = Instant.now();
+                            timeElapsed = Duration.between(start, end);
+                            System.out.println(String.format("[Peer %d]: Search complete. (took %s)", peer.peerID, peer.pretty(timeElapsed)));
 
                             // clean up the serialized string into a String array
-                            String[] peerList = response.substring(1, response.length()-1).split(", ");
+                            if (response.length() > 2) {
+                                String[] peerList = response.substring(1, response.length()-1).split(", ");
 
-                            // iterate through each peer and try to download file
-                            // from them. if successful, we are finished.
-                            for (String p : peerList) {
-                                try {
-                                    // 'target' refers to the peer we are currently trying to communicate with.
-                                    // we first deserialize that peer and open a socket to it.
-                                    PeerMetadata target = PeerMetadata.parseString(p);
-                                    Socket targetSocket = new Socket("127.0.0.1", target.getServerPort());
-                                    DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
-                                    DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
+                                // iterate through each peer and try to download file
+                                // from them. if successful, we are finished.
+                                for (String p : peerList) {
+                                    try {
+                                        // 'target' refers to the peer we are currently trying to communicate with.
+                                        // we first deserialize that peer and open a socket to it.
+                                        PeerMetadata target = PeerMetadata.parseString(p);
+                                        Socket targetSocket = new Socket("127.0.0.1", target.getServerPort());
+                                        DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
+                                        DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
 
-                                    // send the request to target for the given file
-                                    targetOut.writeUTF(String.format("retrieve %s", fileName));
+                                        // send the request to target for the given file
+                                        start = Instant.now();
+                                        targetOut.writeUTF(String.format("retrieve %s", fileName));
 
-                                    // for writing to our own file directory
-                                    DataOutputStream fileOut = new DataOutputStream(
-                                        new FileOutputStream(
-                                            String.format("%s/%s", peer.fileDirectory.getPath(), fileName)
-                                        )
-                                    );
+                                        // for writing to our own file directory
+                                        DataOutputStream fileOut = new DataOutputStream(
+                                            new FileOutputStream(
+                                                String.format("%s/%s", peer.fileDirectory.getPath(), fileName)
+                                            )
+                                        );
 
-                                    // code for sending/receiving bytes over socket from adapted from:
-                                    //      https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
-                                    int count;
-                                    byte[] buffer = new byte[8192];
-                                    while ((count = targetIn.read(buffer)) > 0) {
-                                        fileOut.write(buffer, 0, count-1);
+                                        // code for sending/receiving bytes over socket from adapted from:
+                                        //      https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
+                                        System.out.println(String.format("[Peer %d]: Downloading '%s' from Peer %d...", peer.peerID, fileName, target.getID()));
+                                        int count;
+                                        byte[] buffer = new byte[8192];
+                                        while ((count = targetIn.read(buffer)) > 0) {
+                                            fileOut.write(buffer, 0, count-1);
+                                        }
+                                        end = Instant.now();
+                                        timeElapsed = Duration.between(start, end);
+                                        System.out.println(String.format("[Peer %d]: Download complete. (took %s)", peer.peerID, peer.pretty(timeElapsed)));
+
+                                        // close sockets
+                                        fileOut.close();
+                                        targetSocket.close();
+                                        break;
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
                                     }
-                                    System.out.println(String.format("[Peer %d]: Downloaded '%s' from Peer %d.", peer.peerID, fileName, target.getID()));
-
-                                    // close sockets
-                                    fileOut.close();
-                                    targetSocket.close();
-                                    break;
-                                } catch (Exception e) {
-                                    e.printStackTrace();
                                 }
                             }
                             break;
@@ -241,6 +259,16 @@ public class Peer {
             in.close();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public String pretty(Duration elapsed) {
+        if (elapsed.toMillis() < 1) {
+            return String.format("%d ns", elapsed.toNanos());
+        } else if (elapsed.toSeconds() < 1) {
+            return String.format("%d ms", elapsed.toMillis());
+        } else {
+            return String.format("%d s", elapsed.toSeconds());
         }
     }
 

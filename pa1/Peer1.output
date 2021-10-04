@@ -1,0 +1,19 @@
+[Peer 1]: Listening at 127.0.0.1:40803
+[Peer 1]: Registering file 'Moana.txt'
+[Peer 1]: Registering file 'Chef.txt'
+[Peer 1]: Registering file 'AboutTime.txt'
+[Peer 1]: Registering file 'SpaceCowboys.txt'
+[Peer 1]: Registering file 'Megamind.txt'
+[Peer 1]: Registering file 'TheShawshankRedemption.txt'
+[Peer 1]: Registering file 'Warrior.txt'
+[Peer 1]: Registering file 'Inception.txt'
+[Peer 1]: Registering file 'Tenet.txt'
+[Peer 1]: Registering file 'Moneyball.txt'
+(p2p) :: search ThePrestige.txt
+[Peer 1]: Search complete. (took 707000 ns)
+[Peer 1]: Downloading 'ThePrestige.txt' from Peer 3...
+[Peer 1]: Download complete. (took 1 ms)
+(p2p) :: deregister ThePrestige.txt
+[Peer 1]: 'deregister' took 585000 ns
+(p2p) :: register ThePrestige.txt
+[Peer 1]: 'register' took 503000 ns

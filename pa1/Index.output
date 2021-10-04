@@ -1,0 +1,46 @@
+[Index]: Listening on 127.0.0.1:40451...
+[Index]: Registered Peer 1 at 127.0.0.1:40803.
+[Index]: Registered 'Moana.txt' to Peer 1
+[Index]: Registered 'Chef.txt' to Peer 1
+[Index]: Registered 'AboutTime.txt' to Peer 1
+[Index]: Registered 'SpaceCowboys.txt' to Peer 1
+[Index]: Registered 'Megamind.txt' to Peer 1
+[Index]: Registered 'TheShawshankRedemption.txt' to Peer 1
+[Index]: Registered 'Warrior.txt' to Peer 1
+[Index]: Registered 'Inception.txt' to Peer 1
+[Index]: Registered 'Tenet.txt' to Peer 1
+[Index]: Registered 'Moneyball.txt' to Peer 1
+[Index]: Registered Peer 2 at 127.0.0.1:34011.
+[Index]: Registered 'FreedomWriters.txt' to Peer 2
+[Index]: Registered 'Coco.txt' to Peer 2
+[Index]: Registered 'Megamind.txt' to Peer 2
+[Index]: Registered 'TheShawshankRedemption.txt' to Peer 2
+[Index]: Registered 'Up.txt' to Peer 2
+[Index]: Registered 'AirBud.txt' to Peer 2
+[Index]: Registered 'TheLincolnLawyer.txt' to Peer 2
+[Index]: Registered 'Warrior.txt' to Peer 2
+[Index]: Registered 'Inception.txt' to Peer 2
+[Index]: Registered 'LifeIsBeautiful.txt' to Peer 2
+[Index]: Registered Peer 3 at 127.0.0.1:39363.
+[Index]: Registered 'ThePrestige.txt' to Peer 3
+[Index]: Registered 'Chef.txt' to Peer 3
+[Index]: Registered 'DjangoUnchained.txt' to Peer 3
+[Index]: Registered 'Coco.txt' to Peer 3
+[Index]: Registered 'Megamind.txt' to Peer 3
+[Index]: Registered 'TheShawshankRedemption.txt' to Peer 3
+[Index]: Registered 'Inception.txt' to Peer 3
+[Index]: Registered 'LifeIsBeautiful.txt' to Peer 3
+[Index]: Registered 'EuroVision.txt' to Peer 3
+[Index]: Registered 'SavingPrivateRyan.txt' to Peer 3
+[Index]: Found 'TheLincolnLawyer.txt' in registry. Returning its Peer List.
+[Index]: Registered 'TheLincolnLawyer.txt' to Peer 3
+[Index]: Deregistered Peer 3 from 'TheLincolnLawyer.txt'.
+[Index]: Registered 'TheLincolnLawyer.txt' to Peer 3
+[Index]: Found 'DjangoUnchained.txt' in registry. Returning its Peer List.
+[Index]: Registered 'DjangoUnchained.txt' to Peer 2
+[Index]: Deregistered Peer 2 from 'Warrior.txt'.
+[Index]: Registered 'Warrior.txt' to Peer 2
+[Index]: Found 'ThePrestige.txt' in registry. Returning its Peer List.
+[Index]: Registered 'ThePrestige.txt' to Peer 1
+[Index]: Deregistered Peer 1 from 'ThePrestige.txt'.
+[Index]: Registered 'ThePrestige.txt' to Peer 1

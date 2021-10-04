@@ -1,0 +1,19 @@
+[Peer 2]: Listening at 127.0.0.1:34011
+[Peer 2]: Registering file 'FreedomWriters.txt'
+[Peer 2]: Registering file 'Coco.txt'
+[Peer 2]: Registering file 'Megamind.txt'
+[Peer 2]: Registering file 'TheShawshankRedemption.txt'
+[Peer 2]: Registering file 'Up.txt'
+[Peer 2]: Registering file 'AirBud.txt'
+[Peer 2]: Registering file 'TheLincolnLawyer.txt'
+[Peer 2]: Registering file 'Warrior.txt'
+[Peer 2]: Registering file 'Inception.txt'
+[Peer 2]: Registering file 'LifeIsBeautiful.txt'
+(p2p) :: search DjangoUnchained.txt
+[Peer 2]: Search complete. (took 515000 ns)
+[Peer 2]: Downloading 'DjangoUnchained.txt' from Peer 3...
+[Peer 2]: Download complete. (took 3 ms)
+(p2p) :: deregister Warrior.txt
+[Peer 2]: 'deregister' took 610000 ns
+(p2p) :: register Warrior.txt
+[Peer 2]: 'register' took 891000 ns

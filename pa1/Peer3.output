@@ -1,0 +1,19 @@
+[Peer 3]: Listening at 127.0.0.1:39363
+[Peer 3]: Registering file 'ThePrestige.txt'
+[Peer 3]: Registering file 'Chef.txt'
+[Peer 3]: Registering file 'DjangoUnchained.txt'
+[Peer 3]: Registering file 'Coco.txt'
+[Peer 3]: Registering file 'Megamind.txt'
+[Peer 3]: Registering file 'TheShawshankRedemption.txt'
+[Peer 3]: Registering file 'Inception.txt'
+[Peer 3]: Registering file 'LifeIsBeautiful.txt'
+[Peer 3]: Registering file 'EuroVision.txt'
+[Peer 3]: Registering file 'SavingPrivateRyan.txt'
+(p2p) :: search TheLincolnLawyer.txt
+[Peer 3]: Search complete. (took 1 ms)
+[Peer 3]: Downloading 'TheLincolnLawyer.txt' from Peer 2...
+[Peer 3]: Download complete. (took 1 ms)
+(p2p) :: deregister TheLincolnLawyer.txt
+[Peer 3]: 'deregister' took 664000 ns
+(p2p) :: register TheLincolnLawyer.txt
+[Peer 3]: 'register' took 534000 ns
