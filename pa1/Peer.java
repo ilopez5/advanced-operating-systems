@@ -1,14 +1,8 @@
 import java.util.*;
 import java.net.*;
 import java.io.*;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchService;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchEvent;
-import java.time.Duration;
-import java.time.Instant;
+import java.nio.file.*;
+import java.time.*;
 
 /**
  *  Peer - this class defines each peer which make up a P2P network. Each peer
@@ -33,11 +27,11 @@ import java.time.Instant;
 public class Peer {
     /* peer metadata */
     private int peerID;
-    private File fileDirectory;
-    private Socket indexSocket;
-    private ServerSocket server;
-    private DataInputStream fromIndex;
-    private DataOutputStream toIndex;
+    private File fileDirectory; // directory containing peer's files
+    private Socket indexSocket; // socket to the index server
+    private ServerSocket server; // a (server) socket for other peers to connect to
+    private DataInputStream fromIndex; // for recieving responses from indexing server
+    private DataOutputStream toIndex; // for sending requests to indexing server
 
     /* peer constructor */
     public Peer(int peerID, File fileDirectory, int indexPort) {
@@ -59,16 +53,15 @@ public class Peer {
     }
 
     public static void main(String[] args) {
-        // parse program arguments and init an object of this class
-        Peer peer = new Peer(
-            Integer.parseInt(args[0]),
-            new File(args[1]),
-            Integer.parseInt(args[2])
-        );
-
         try {
-            // register my peer id, my (server) port, and my initial files
-            // to Index server.
+            // parse program arguments and initialize an object of this class
+            Peer peer = new Peer(
+                Integer.parseInt(args[0]),
+                new File(args[1]),
+                Integer.parseInt(args[2])
+            );
+
+            // register this peer's id, (server) port, and files to Index server.
             peer.register();
 
             /**
@@ -96,7 +89,7 @@ public class Peer {
             peer.cli();
 
             // clean up
-            peer.indexSocket.close();
+            peer.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -251,11 +244,24 @@ public class Peer {
         }
     }
 
+
+    /**
+     *  close - does any clean up work (for now entails closing sockets).
+     */
+    private void close() {
+        try {
+            this.indexSocket.close();
+            this.server.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     /**
      *  retrieve - Given a 'fileName' and a DataOutputStream, will stream that
      *              file to caller.
      */
-    public void retrieve (String fileName, DataOutputStream out) {
+    private void retrieve (String fileName, DataOutputStream out) {
         try {
             DataInputStream in = new DataInputStream(
                 new FileInputStream(
@@ -277,7 +283,7 @@ public class Peer {
     /**
      *  pretty - helper function to print the elapsed time with appropriate units.
      */
-    public String pretty(Duration elapsed) {
+    private String pretty(Duration elapsed) {
         if (elapsed.toMillis() < 1) {
             return String.format("%d ns", elapsed.toNanos());
         } else if (elapsed.toSeconds() < 1) {
