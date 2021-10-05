@@ -33,8 +33,8 @@ import java.time.Instant;
 public class Peer {
     /* peer metadata */
     private int peerID;
-    private int indexPort;
     private File fileDirectory;
+    private Socket indexSocket;
     private ServerSocket server;
     private DataInputStream fromIndex;
     private DataOutputStream toIndex;
@@ -43,12 +43,16 @@ public class Peer {
     public Peer(int peerID, File fileDirectory, int indexPort) {
         this.peerID = peerID;
         this.fileDirectory = fileDirectory;
-        this.indexPort = indexPort;
         try {
             // opens a ServerSocket for other peers to connect to
             this.server = new ServerSocket(0);
             this.server.setReuseAddress(true);
             System.out.println(String.format("[Peer %d]: Listening at 127.0.0.1:%d", this.peerID, this.server.getLocalPort()));
+
+            // opens data/input streams to the server socket
+            this.indexSocket = new Socket("127.0.0.1", indexPort);
+            this.fromIndex = new DataInputStream(indexSocket.getInputStream());
+            this.toIndex = new DataOutputStream(indexSocket.getOutputStream());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -65,11 +69,6 @@ public class Peer {
         try {
             // register my peer id, my (server) port, and my initial files
             // to Index server.
-            // dataIn is for messages received FROM THE INDEX
-            // dataOut is for requests we send TO THE INDEX
-            Socket indexSocket = new Socket("127.0.0.1", peer.indexPort);
-            peer.fromIndex = new DataInputStream(indexSocket.getInputStream());
-            peer.toIndex = new DataOutputStream(indexSocket.getOutputStream());
             peer.register();
 
             /**
@@ -97,7 +96,7 @@ public class Peer {
             peer.cli();
 
             // clean up
-            indexSocket.close();
+            peer.indexSocket.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -227,7 +226,7 @@ public class Peer {
      *              it this peer's ID and port. Then, it registers all files in
      *              the given directory.
      */
-    public void register() {
+    private void register() {
         try {
             // 1. initial handshake
             this.toIndex.writeInt(this.peerID);
@@ -275,6 +274,9 @@ public class Peer {
         }
     }
 
+    /**
+     *  pretty - helper function to print the elapsed time with appropriate units.
+     */
     public String pretty(Duration elapsed) {
         if (elapsed.toMillis() < 1) {
             return String.format("%d ns", elapsed.toNanos());
