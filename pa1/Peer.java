@@ -63,26 +63,6 @@ public class Peer {
         );
 
         try {
-            /**
-             *  PeerServer section:
-             *      spawns a PeerListener thread that listens for any incoming
-             *      peer connections. Upon recieving a connection, the PeerListener
-             *      spawns a PeerHandler thread to deal with it.
-             */
-            PeerListener pl = peer.new PeerListener(peer);
-            pl.start();
-
-
-            /**
-             *  EventListener section:
-             *      spawns an EventListener thread that watches for any changes
-             *      to the given directory. If new file, registers it. If a file
-             *      is deleted, deregisters it. Nothing if a file is modified (TBD)
-             */
-            EventListener el = peer.new EventListener(peer);
-            el.start();
-
-
             // register my peer id, my (server) port, and my initial files
             // to Index server.
             // dataIn is for messages received FROM THE INDEX
@@ -93,14 +73,48 @@ public class Peer {
             peer.register();
 
             /**
-             * User CLI Section:
+             *  PeerServer section:
+             *      spawns a PeerListener thread that listens for any incoming
+             *      peer connections. Upon recieving a connection, the PeerListener
+             *      spawns a PeerHandler thread to deal with it.
+             */
+            PeerListener pl = peer.new PeerListener(peer);
+            pl.start();
+
+            /**
+             *  EventListener section:
+             *      spawns an EventListener thread that watches for any changes
+             *      to the given directory. If new file, registers it. If a file
+             *      is deleted, deregisters it. Nothing if a file is modified (TBD)
+             */
+            EventListener el = peer.new EventListener(peer);
+            el.start();
+
+            /**
+             *  User CLI Section:
              *      runs until program is interrupted or 'exit' is entered
              */
-            Scanner sc = new Scanner(System.in);
-            String line = null;
+            peer.cli();
+
+            // clean up
+            indexSocket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     *  cli - provides the command line interface (CLI) for user (interactive)
+     *
+     *
+     */
+    private void cli() {
+        try {
             int rc;
+            String line = null;
             Instant start, end;
             Duration timeElapsed;
+            Scanner sc = new Scanner(System.in);
 
             while (!"exit".equalsIgnoreCase(line)) {
                 // print a prompt to the user, then read input
@@ -120,31 +134,31 @@ public class Peer {
                         case "deregister":
                             // send command to Index
                             start = Instant.now();
-                            peer.toIndex.writeUTF(line);
-                            rc = peer.fromIndex.readInt();
+                            this.toIndex.writeUTF(line);
+                            rc = this.fromIndex.readInt();
                             end = Instant.now();
                             timeElapsed = Duration.between(start, end);
-                            System.out.println(String.format("[Peer %d]: '%s' took %s", peer.peerID, command, peer.pretty(timeElapsed)));
+                            System.out.println(String.format("[Peer %d]: '%s' took %s", this.peerID, command, this.pretty(timeElapsed)));
                             if (rc > 0) {
-                                System.out.println(String.format("[Peer %d]: Received error code %d", peer.peerID, rc));
+                                System.out.println(String.format("[Peer %d]: Received error code %d", this.peerID, rc));
                             }
                             break;
                         case "search":
                             // if this peer already contains file, save a communication
                             // call by doing nothing.
-                            if (new File(String.format("%s/%s", peer.fileDirectory, fileName)).exists()) {
-                                System.out.println(String.format("[Peer %d]: '%s' is already here. Ignoring.", peer.peerID, fileName));
+                            if (new File(String.format("%s/%s", this.fileDirectory, fileName)).exists()) {
+                                System.out.println(String.format("[Peer %d]: '%s' is already here. Ignoring.", this.peerID, fileName));
                                 continue;
                             }
 
                             // send command to Index, receive response which should
                             // be a serialized list of PeerMetadata objects.
                             start = Instant.now();
-                            peer.toIndex.writeUTF(line);
-                            String response = peer.fromIndex.readUTF();
+                            this.toIndex.writeUTF(line);
+                            String response = this.fromIndex.readUTF();
                             end = Instant.now();
                             timeElapsed = Duration.between(start, end);
-                            System.out.println(String.format("[Peer %d]: Search complete. (took %s)", peer.peerID, peer.pretty(timeElapsed)));
+                            System.out.println(String.format("[Peer %d]: Search complete. (took %s)", this.peerID, this.pretty(timeElapsed)));
 
                             // clean up the serialized string into a String array
                             if (response.length() > 2) {
@@ -168,13 +182,13 @@ public class Peer {
                                         // for writing to our own file directory
                                         DataOutputStream fileOut = new DataOutputStream(
                                             new FileOutputStream(
-                                                String.format("%s/%s", peer.fileDirectory.getPath(), fileName)
+                                                String.format("%s/%s", this.fileDirectory.getPath(), fileName)
                                             )
                                         );
 
                                         // code for sending/receiving bytes over socket from adapted from:
                                         //      https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
-                                        System.out.println(String.format("[Peer %d]: Downloading '%s' from Peer %d...", peer.peerID, fileName, target.getID()));
+                                        System.out.println(String.format("[Peer %d]: Downloading '%s' from Peer %d...", this.peerID, fileName, target.getID()));
                                         int count;
                                         byte[] buffer = new byte[8192];
                                         while ((count = targetIn.read(buffer)) > 0) {
@@ -182,7 +196,7 @@ public class Peer {
                                         }
                                         end = Instant.now();
                                         timeElapsed = Duration.between(start, end);
-                                        System.out.println(String.format("[Peer %d]: Download complete. (took %s)", peer.peerID, peer.pretty(timeElapsed)));
+                                        System.out.println(String.format("[Peer %d]: Download complete. (took %s)", this.peerID, this.pretty(timeElapsed)));
 
                                         // close sockets
                                         fileOut.close();
@@ -195,7 +209,7 @@ public class Peer {
                             }
                             break;
                         default:
-                            System.out.println(String.format("[Peer %d]: Unknown command '%s'. Ignoring.", peer.peerID, command));
+                            System.out.println(String.format("[Peer %d]: Unknown command '%s'. Ignoring.", this.peerID, command));
                             continue;
                     }
                 }
@@ -203,7 +217,6 @@ public class Peer {
 
             // clean up
             sc.close();
-            indexSocket.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
