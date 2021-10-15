@@ -189,12 +189,10 @@ public class SuperPeer {
                 // receive address:port for Peer's server socket
                 PeerMetadata peer = PeerMetadata.parseString(fromPeer.readUTF());
 
-                // parse a command from peer
-                while (true) {
-                    // receive a command in the form of "command fileName"
-                    //      e.g., "search Moana.txt"
-                    String[] request = fromPeer.readUTF().split("[ \t]+");
-                    if (request.length > 0) {
+                // parse a command from peer in the form of "command fileName"
+                //      e.g., "search Moana.txt"
+                String[] request = fromPeer.readUTF().split("[ \t]+");
+                if (request.length > 0) {
     //                     String command = request[0];
     //                     String fileName = request[1];
 
@@ -217,8 +215,8 @@ public class SuperPeer {
     //                             System.out.println(String.format("[Index]: Received unknown command '%s'. Ignoring.", command));
     //                             break;
     //                     }
-                    }
                 }
+                this.peerSocket.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
