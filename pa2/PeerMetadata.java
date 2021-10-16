@@ -9,8 +9,8 @@
  */
 public class PeerMetadata {
     /* metadata */
-    private String address;
-    private int port; // refers to server port. if ambiguous, will rename
+    private String address; // IPv4 address
+    private int port; // refers to server port
 
     /* constructor */
     public PeerMetadata(String address, int port) {
@@ -19,41 +19,24 @@ public class PeerMetadata {
     }
 
     /* getters */
-    public String getAddress() {
-        return this.address;
-    }
+    public String getAddress() { return this.address; }
 
-    public int getPort() {
-        return this.port;
-    }
+    public int getPort() { return this.port; }
 
-    public String getFullAddress() {
-        return String.format("%s:%d", this.address, this.port);
-    }
+    public String getFullAddress() { return String.format("%s:%d", this.address, this.port); }
 
-    /* helper methods */
-
-    /**
-     *  equals - compares the equality of two PeerMetadata objects using both
-     *          their address and port number (since those are gauranteed to be
-     *          unique)
-     */
+    /** equals - compares the equality of two PeerMetadata objects */
     public boolean equals(PeerMetadata other) {
         return this.address.equals(other.getAddress()) && this.port == other.getPort();
     }
 
-    /**
-     *  toString - serializes the PeerMetadata object into a string.
-     */
+    /** toString - serializes the PeerMetadata object */
     public String toString() {
         return this.getFullAddress();
     }
 
-    /**
-     *  parseString - static method for deserializing a PeerMetadata string into
-     *              an actual object of the class.
-     */
-    public static PeerMetadata parseString(String peer) {
+    /** parse - deserializes a PeerMetadata object */
+    public static PeerMetadata parse(String peer) {
         String[] components = peer.split(":");
         return new PeerMetadata(components[0], Integer.parseInt(components[1]));
     }

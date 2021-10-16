@@ -49,7 +49,7 @@ public class Peer {
 
     // ServerPeer-related metadata
     private PeerMetadata superPeer;
-    private Socket superPeerSocket;
+    private Socket spSocket;
     private DataInputStream fromSuperPeer;
     private DataOutputStream toSuperPeer;
 
@@ -58,7 +58,7 @@ public class Peer {
         try {
             this.registry = ConcurrentHashMap.newKeySet();
             this.messageLog = new ConcurrentHashMap<String, Boolean>();
-            this.metadata = PeerMetadata.parseString(address);
+            this.metadata = PeerMetadata.parse(address);
             this.fileDir = fileDirectory;
             this.config = config;
             this.sequence = 0;
@@ -116,10 +116,8 @@ public class Peer {
         }
     }
 
-    /**
-     *  cli - provides the command line interface (CLI) for user (interactive)
-     */
-    private void cli() {
+    /** cli - provides the command line interface for interactive user input */
+    public void cli() {
         try {
             String line = null;
             Scanner sc = new Scanner(System.in);
@@ -160,53 +158,40 @@ public class Peer {
         }
     }
 
-    /**
-     *  initialize - figures out the SuperPeer address:port and registers all
-     *              files into an in-memory thread-safe hash set.
-     */
-    private void initialize() {
+    /** initialize - finds SuperPeer, then registers all files */
+    public void initialize() {
+        this.getSuperPeer();
+        this.register();
+    }
+
+    /** register - goes through given directory and registers all the files within */
+    public Peer register() {
         try {
-            // determine who my SuperPeer is by reading config file
-            FileInputStream fis = new FileInputStream(this.config);
-            Scanner sc = new Scanner(fis);
-            while (sc.hasNextLine()) {
-                // parse and decompose line
-                String[] line = sc.nextLine().split(" ");
-                String type = line[0];
-                if (type.equals("p")) {
-                    // only care about p lines
-                    PeerMetadata superPeer = PeerMetadata.parseString(line[1]);
-                    PeerMetadata peer = PeerMetadata.parseString(line[2]);
-
-                    if (this.equals(peer)) {
-                        // this is us!
-                        this.superPeer = superPeer;
-                        this.superPeerSocket = new Socket(
-                            this.superPeer.getAddress(),
-                            this.superPeer.getPort()
-                        );
-                        this.fromSuperPeer = new DataInputStream(this.superPeerSocket.getInputStream());
-                        this.toSuperPeer = new DataOutputStream(this.superPeerSocket.getOutputStream());
-                        break;
-                    }
-                }
-            }
-            sc.close();
-
             // register files in directory to our in-memory registry
+            int rc;
             for (File file : this.fileDir.listFiles()) {
                 if (file.isFile()) {
-                    // register file with Index server
                     this.log(String.format("Registering file '%s'", file.getName()));
+                    // add file to Peer in-memory registry
                     this.registry.add(file.getName());
+                    // register with SuperPeer, which acts as a PA1 Index.
+                    this.toSuperPeer.writeUTF(
+                        String.format("register %s %s", file.getName(), this.toString())
+                    );
+                    rc = this.fromSuperPeer.readInt();
+                    if (rc > 0) {
+                        this.log(String.format("Registration failed. Recieved error code %d", rc));
+                    }
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return this;
     }
 
-    private void download(Message message) {
+    /** download - given a message containing the Peer that has file, download it */
+    private Peer download(Message message) {
         try {
             Instant start, end;
             Duration timeElapsed;
@@ -245,9 +230,11 @@ public class Peer {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return this;
     }
 
-    private void upload(String message, DataOutputStream out) {
+    /** upload - given a message and an output stream, writes to it */
+    private Peer upload(String message, DataOutputStream out) {
         try {
             Message msg = Message.parse(message);
             DataInputStream in = new DataInputStream(
@@ -265,25 +252,11 @@ public class Peer {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return this;
     }
 
-    /**
-     *  close - closes any sockets before Peer is terminated.
-     */
-    private void close() {
-        try {
-            this.superPeerSocket.close();
-            this.server.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     *  query - forwards fileName request to SuperPeer, gets back peers that have
-     *          the file, then downloads it from one of them.
-     */
-    public void query(int sequenceID, int ttl, String fileName) {
+    /** query - creates a Message, sends to SuperPeer */
+    public Peer query(int sequenceID, int ttl, String fileName) {
         try {
             String messageID = String.format("%s-%d", this.getFullAddress(), sequenceID);
             Message query = new Message(messageID, ttl, fileName);
@@ -292,32 +265,79 @@ public class Peer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return this;
     }
 
+
     /**
-     *  log - helper method for logging messages with a descriptive prefix.
+     * HELPER METHODS
      */
-    private void log(String message) {
+
+
+    /** close - closes any sockets before Peer is terminated*/
+    public Peer close() {
+        try {
+            this.spSocket.close();
+            this.server.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** getSuperPeer - either returns an already determined SuperPeer, or finds it in config */
+    public Peer getSuperPeer() {
+        try {
+            if (this.superPeer == null) {
+                // determine who my SuperPeer is by reading config file
+                Scanner sc = new Scanner(new FileInputStream(this.config));
+                while (sc.hasNextLine()) {
+                    // parse and decompose line
+                    String[] line = sc.nextLine().split(" ");
+                    String type = line[0];
+                    if (type.equals("p")) {
+                        // only care about p lines
+                        PeerMetadata superPeer = PeerMetadata.parse(line[1]);
+                        PeerMetadata peer = PeerMetadata.parse(line[2]);
+
+                        if (this.equals(peer)) {
+                            // this is us!
+                            this.superPeer = superPeer;
+                            this.spSocket = new Socket(
+                                this.superPeer.getAddress(),
+                                this.superPeer.getPort()
+                            );
+                            this.fromSuperPeer = new DataInputStream(this.spSocket.getInputStream());
+                            this.toSuperPeer = new DataOutputStream(this.spSocket.getOutputStream());
+                            break;
+                        }
+                    }
+                }
+                sc.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** log - helper method for logging messages with a descriptive prefix. */
+    public Peer log(String message) {
         System.out.println(String.format("[P %s]: %s", this.getFullAddress(), message));
+        return this;
     }
 
-    /**
-     *  equals - compares this Peer's PeerMetadata with anothers.
-     */
+    /** equals - compares this Peer's PeerMetadata with another's */
     public boolean equals(PeerMetadata other) {
         return this.metadata.equals(other);
     }
 
-    /**
-     *  getFullAddress - returns full IPv4 address and port number.
-     */
+    /** getFullAddress - returns full IPv4 address and port number */
     public String getFullAddress() {
         return this.metadata.getFullAddress();
     }
 
-    /**
-     *  pretty - helper function to print the elapsed time with appropriate units.
-     */
+    /** pretty - print the elapsed time with appropriate units */
     public String pretty(Duration elapsed) {
         if (elapsed.toMillis() < 1) {
             return String.format("%d ns", elapsed.toNanos());
@@ -328,6 +348,13 @@ public class Peer {
         }
     }
 
+    /** toString - serializes the Peer */
+    public String toString() {
+        return this.metadata.toString();
+    }
+
+
+
     /**
      *  Nested Classes:
      *
@@ -335,13 +362,13 @@ public class Peer {
      *                  from peers. on receiving an incoming request, spins up
      *                  a PeerHandler thread to parse and execute that request.
      *
-     *      PeerHandler - This handles the requests for each peer that communicates
+     *      PeerHandler - this handles the requests for each peer that communicates
      *                  with it. Upon completion, the socket connection is closed.
      *
      *      EventListener - this watches the peer's file directory for any events
-     *                  where a file is created, deleted, or modified. Upon a file
-     *                  being created, it is registered with the Index. Upon a file
-     *                  being deleted, it is deregistered from the Index.
+     *                  where a file is created or deleted.
+     *                      Creation -> registered with SuperPeer
+     *                      Deleted  -> deregistered from the SuperPeer.
      */
     public class PeerListener extends Thread {
         /* reference to the Peer or SuperPeer this listener works for */
@@ -453,11 +480,13 @@ public class Peer {
                         if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             // a file was deleted so we deregister
                             this.peer.registry.remove(event.context().toString());
+                            this.peer.toSuperPeer.writeUTF(String.format("deregister %s %s", event.context().toString(), this.peer));
+                            this.peer.fromSuperPeer.readInt();
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
                             // a file was deleted so we deregister
                             this.peer.registry.add(event.context().toString());
-                        } else {
-                            // a file was just modified -> NOT IMPLEMENTED
+                            this.peer.toSuperPeer.writeUTF(String.format("register %s %s", event.context().toString(), this.peer));
+                            this.peer.fromSuperPeer.readInt();
                         }
                     }
                     watchKey.reset();
