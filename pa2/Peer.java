@@ -25,10 +25,10 @@ import java.time.Instant;
  *          lastly, it will present a basic CLI for user interaction.
  *
  *          Accepted syntax:
- *              (p2p) :: <command> <fileName>
+ *              (p2p-cli) => <command> <fileName>
  *
  *          e.g.,
- *              (p2p) :: search Inception.txt
+ *              (p2p-cli) => search Inception.mp4
  *
  *          Citations:
  *              [1] https://www.geeksforgeeks.org/socket-programming-in-java/
@@ -42,7 +42,10 @@ public class Peer {
     private File fileDir;
     private File config;
     private ServerSocket server;
-    private Set<String> fileRegistry;
+    private Set<String> registry;
+    private int sequence;
+    private int ttl;
+    private ConcurrentHashMap<String, Boolean> messageLog;
 
     // ServerPeer-related metadata
     private PeerMetadata superPeer;
@@ -51,12 +54,15 @@ public class Peer {
     private DataOutputStream toSuperPeer;
 
     /* peer constructor */
-    public Peer(String address, File fileDirectory, File config) {
+    public Peer(String address, File fileDirectory, File config, int ttl) {
         try {
-            this.fileRegistry = ConcurrentHashMap.newKeySet();
+            this.registry = ConcurrentHashMap.newKeySet();
+            this.messageLog = new ConcurrentHashMap<String, Boolean>();
             this.metadata = PeerMetadata.parseString(address);
             this.fileDir = fileDirectory;
             this.config = config;
+            this.sequence = 0;
+            this.ttl = ttl;
 
             // opens a ServerSocket for other peers to connect to
             this.server = new ServerSocket(this.metadata.getPort());
@@ -74,7 +80,7 @@ public class Peer {
     public static void main(String[] args) {
         try {
             // parse program arguments and init an object of this class
-            Peer peer = new Peer(args[0], new File(args[1]), new File(args[2]));
+            Peer peer = new Peer(args[0], new File(args[1]), new File(args[2]), 10);
 
             // look into file directory and store records of all my files
             peer.initialize();
@@ -97,15 +103,14 @@ public class Peer {
             PeerListener pl = peer.new PeerListener(peer);
             pl.start();
 
-
             /**
              *  User CLI Section:
              *      runs until program is interrupted or 'exit' is entered
              */
-            // peer.cli();
+            peer.cli();
 
             // clean up
-            peer.superPeerSocket.close();
+            peer.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -113,20 +118,15 @@ public class Peer {
 
     /**
      *  cli - provides the command line interface (CLI) for user (interactive)
-     *
-     *
      */
     private void cli() {
         try {
-            int rc;
             String line = null;
-            Instant start, end;
-            Duration timeElapsed;
             Scanner sc = new Scanner(System.in);
 
             while (!"exit".equalsIgnoreCase(line)) {
                 // print a prompt to the user, then read input
-                System.out.print("(p2p) :: ");
+                System.out.print("(p2p-cli) => ");
                 line = sc.nextLine();
 
                 // user input must have format: "command fileName"
@@ -138,87 +138,17 @@ public class Peer {
 
                     // check that 'command' is supported.
                     switch (command) {
-                        case "register":
-                        case "deregister":
-                            // send command to Index
-                            start = Instant.now();
-                            this.toSuperPeer.writeUTF(line);
-                            rc = this.fromSuperPeer.readInt();
-                            end = Instant.now();
-                            timeElapsed = Duration.between(start, end);
-                            System.out.println(String.format("[Peer ]: '%s' took %s", command, this.pretty(timeElapsed)));
-                            if (rc > 0) {
-                                System.out.println(String.format("Received error code %d", rc));
-                            }
-                            break;
                         case "search":
-                            // if this peer already contains file, save a communication
-                            // call by doing nothing.
+                            // if this peer already contains file, save a communication call by doing nothing.
                             if (new File(String.format("%s/%s", this.fileDir, fileName)).exists()) {
-                                System.out.println(String.format("'%s' is already here. Ignoring.", fileName));
+                                this.log(String.format("'%s' is already here. Ignoring.", fileName));
                                 continue;
                             }
-
-                            // send command to Index, receive response which should
-                            // be a serialized list of PeerMetadata objects.
-                            start = Instant.now();
-                            this.toSuperPeer.writeUTF(line);
-                            String response = this.fromSuperPeer.readUTF();
-                            end = Instant.now();
-                            timeElapsed = Duration.between(start, end);
-                            System.out.println(String.format("Search complete. (took %s)", this.pretty(timeElapsed)));
-
-                            // clean up the serialized string into a String array
-                            if (response.length() > 2) {
-                                String[] peerList = response.substring(1, response.length()-1).split(", ");
-
-                                // iterate through each peer and try to download file
-                                // from them. if successful, we are finished.
-                                for (String p : peerList) {
-                                    try {
-                                        // 'target' refers to the peer we are currently trying to communicate with.
-                                        // we first deserialize that peer and open a socket to it.
-                                        PeerMetadata target = PeerMetadata.parseString(p);
-                                        Socket targetSocket = new Socket("127.0.0.1", target.getPort());
-                                        DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
-                                        DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
-
-                                        // send the request to target for the given file
-                                        start = Instant.now();
-                                        targetOut.writeUTF(String.format("retrieve %s", fileName));
-
-                                        // for writing to our own file directory
-                                        DataOutputStream fileOut = new DataOutputStream(
-                                            new FileOutputStream(
-                                                String.format("%s/%s", this.fileDir.getPath(), fileName)
-                                            )
-                                        );
-
-                                        // code for sending/receiving bytes over socket from adapted from:
-                                        //      https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
-                                        System.out.println(String.format("Downloading '%s' from Peer %d...", fileName, target));
-                                        int count;
-                                        byte[] buffer = new byte[8192];
-                                        while ((count = targetIn.read(buffer)) > 0) {
-                                            fileOut.write(buffer, 0, count-1);
-                                        }
-                                        end = Instant.now();
-                                        timeElapsed = Duration.between(start, end);
-                                        System.out.println(String.format("Download complete. (took %s)", this.pretty(timeElapsed)));
-
-                                        // close sockets
-                                        fileOut.close();
-                                        targetSocket.close();
-                                        break;
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                    }
-                                }
-                            }
+                            this.query(this.sequence++, this.ttl, fileName);
                             break;
                         default:
-                            System.out.println(String.format("Unknown command '%s'. Ignoring.", command));
-                            continue;
+                            this.log(String.format("Unknown command '%s'. Ignoring.", command));
+                            break;
                     }
                 }
             }
@@ -268,7 +198,7 @@ public class Peer {
                 if (file.isFile()) {
                     // register file with Index server
                     this.log(String.format("Registering file '%s'", file.getName()));
-                    this.fileRegistry.add(file.getName());
+                    this.registry.add(file.getName());
                 }
             }
         } catch (IOException e) {
@@ -276,15 +206,53 @@ public class Peer {
         }
     }
 
-    /**
-     *  retrieve - Given a 'fileName' and a DataOutputStream, will stream that
-     *              file to caller.
-     */
-    public void retrieve (String fileName, DataOutputStream out) {
+    private void download(Message message) {
         try {
+            Instant start, end;
+            Duration timeElapsed;
+
+            // open sockets to leaf peer
+            Socket targetSocket = new Socket(message.getAddress(), message.getPort());
+            DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
+            DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
+
+            // send the request to target for the given file
+            start = Instant.now();
+            targetOut.writeUTF(String.format("obtain %s", message.toString()));
+
+            // for writing to our own file directory
+            DataOutputStream fileOut = new DataOutputStream(
+                new FileOutputStream(
+                    String.format("%s/%s", this.fileDir.getPath(), message.getFileName())
+                )
+            );
+
+            // code for sending/receiving bytes over socket from adapted from: https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
+            this.log(String.format("Downloading '%s' from Peer %d...", message.getFileName(), message.getFullAddress()));
+            int count;
+            byte[] buffer = new byte[8192];
+            while ((count = targetIn.read(buffer)) > 0) {
+                fileOut.write(buffer, 0, count-1);
+            }
+            this.messageLog.put(message.toString(), true);
+            end = Instant.now();
+            timeElapsed = Duration.between(start, end);
+            this.log(String.format("Download complete. (took %s)", this.pretty(timeElapsed)));
+
+            // close sockets
+            fileOut.close();
+            targetSocket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void upload(String message, DataOutputStream out) {
+        try {
+            Message msg = Message.parse(message);
             DataInputStream in = new DataInputStream(
                 new FileInputStream(
-                    String.format("%s/%s", this.fileDir.getPath(), fileName)
+                    String.format("%s/%s", this.fileDir.getPath(), msg.getFileName())
                 )
             );
 
@@ -297,6 +265,54 @@ public class Peer {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     *  close - closes any sockets before Peer is terminated.
+     */
+    private void close() {
+        try {
+            this.superPeerSocket.close();
+            this.server.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     *  query - forwards fileName request to SuperPeer, gets back peers that have
+     *          the file, then downloads it from one of them.
+     */
+    public void query(int sequenceID, int ttl, String fileName) {
+        try {
+            String messageID = String.format("%s-%d", this.getFullAddress(), sequenceID);
+            Message query = new Message(messageID, ttl, fileName);
+            // send query to SuperPeer
+            this.toSuperPeer.writeUTF(query.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     *  log - helper method for logging messages with a descriptive prefix.
+     */
+    private void log(String message) {
+        System.out.println(String.format("[P %s]: %s", this.getFullAddress(), message));
+    }
+
+    /**
+     *  equals - compares this Peer's PeerMetadata with anothers.
+     */
+    public boolean equals(PeerMetadata other) {
+        return this.metadata.equals(other);
+    }
+
+    /**
+     *  getFullAddress - returns full IPv4 address and port number.
+     */
+    public String getFullAddress() {
+        return this.metadata.getFullAddress();
     }
 
     /**
@@ -313,17 +329,6 @@ public class Peer {
     }
 
     /**
-     *  log - helper method for logging messages with a descriptive prefix.
-     */
-    private void log(String message) {
-        System.out.println(String.format("[P %s]: %s", this.metadata.toString(), message));
-    }
-
-    public boolean equals(PeerMetadata other) {
-        return this.metadata.equals(other);
-    }
-
-    /**
      *  Nested Classes:
      *
      *      PeerListener - this listens on the ServerSocket port and accepts requests
@@ -333,15 +338,10 @@ public class Peer {
      *      PeerHandler - This handles the requests for each peer that communicates
      *                  with it. Upon completion, the socket connection is closed.
      *
-     *      EventListener - This watches the peer's file directory for any events
+     *      EventListener - this watches the peer's file directory for any events
      *                  where a file is created, deleted, or modified. Upon a file
      *                  being created, it is registered with the Index. Upon a file
-     *                  being deleted, it is deregistered from the Index. Modifications
-     *                  are not within the scope of this assignment but it would
-     *                  involve 'search'-ing the Index for the Peer list, then
-     *                  updating them to the change, and possibly having each
-     *                  one of them call 'retrieve' on this peer to get the most
-     *                  up to date changes. This is an expensive operation.
+     *                  being deleted, it is deregistered from the Index.
      */
     public class PeerListener extends Thread {
         /* reference to the Peer or SuperPeer this listener works for */
@@ -356,6 +356,7 @@ public class Peer {
             try {
                 while (true) {
                     // accept an incoming connection
+                    peer.log(String.format("Listening on %s...", peer.metadata.getFullAddress()));
                     Socket ps = this.peer.server.accept();
                     PeerHandler ph = new PeerHandler(this.peer, ps);
                     ph.start();
@@ -385,18 +386,29 @@ public class Peer {
 
                 // receive peer request and parse
                 String[] request = fromPeer.readUTF().split("[ \t]+");
-                // String command = request[0];
-                // String fileName = request[1];
+                String command = request[0];
+                String args = request[1];
 
-                // // handle request (only 'retrieve' for now)
-                // switch (command) {
-                //     case "retrieve":
-                //         this.peer.retrieve(fileName, toPeer);
-                //         break;
-                //     default:
-                //         System.out.println(String.format("[Peer %d]: Received unknown command '%s'. Ignoring.", peer.peerID, command));
-                //         break;
-                // }
+                // handle request
+                switch (command) {
+                    case "queryhit":
+                        // SuperPeer just forwarded a query hit message to you
+                        //  syntax: 'queryhit msgid;ttl;fileName;ip:port'
+                        Message msg = Message.parse(args);
+                        if (!peer.messageLog.get(msg.getMessageID())) {
+                            // we have not downloaded the file yet
+                            this.peer.download(msg);
+                        }
+                        break;
+                    case "obtain":
+                        // another peer wants this file
+                        //  syntax: 'obtain fileName'
+                        this.peer.upload(args, toPeer);
+                        break;
+                    default:
+                        peer.log(String.format("Received unknown command '%s'. Ignoring.", command));
+                        break;
+                }
                 this.peerSocket.close();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -440,10 +452,10 @@ public class Peer {
                     for (WatchEvent<?> event : events) {
                         if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             // a file was deleted so we deregister
-                            this.peer.fileRegistry.remove(event.context().toString());
+                            this.peer.registry.remove(event.context().toString());
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
                             // a file was deleted so we deregister
-                            this.peer.fileRegistry.add(event.context().toString());
+                            this.peer.registry.add(event.context().toString());
                         } else {
                             // a file was just modified -> NOT IMPLEMENTED
                         }

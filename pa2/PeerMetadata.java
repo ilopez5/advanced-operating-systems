@@ -27,6 +27,10 @@ public class PeerMetadata {
         return this.port;
     }
 
+    public String getFullAddress() {
+        return String.format("%s:%d", this.address, this.port);
+    }
+
     /* helper methods */
 
     /**
@@ -42,7 +46,7 @@ public class PeerMetadata {
      *  toString - serializes the PeerMetadata object into a string.
      */
     public String toString() {
-        return String.format("%s:%d", this.address, this.port);
+        return this.getFullAddress();
     }
 
     /**
