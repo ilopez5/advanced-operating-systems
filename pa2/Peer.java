@@ -82,9 +82,6 @@ public class Peer {
             // parse program arguments and init an object of this class
             Peer peer = new Peer(args[0], new File(args[1]), new File(args[2]), 10);
 
-            // look into file directory and store records of all my files
-            peer.register();
-
             /**
              *  EventListener section:
              *      spawns an EventListener thread that watches for any changes
@@ -103,6 +100,9 @@ public class Peer {
             PeerListener pl = peer.new PeerListener(peer);
             pl.start();
 
+            // look into file directory and store records of all my files
+            peer.register();
+
             /**
              *  User CLI Section:
              *      runs until program is interrupted or 'exit' is entered
@@ -119,6 +119,7 @@ public class Peer {
     /** cli - provides the command line interface for interactive user input */
     public void cli() {
         try {
+            int rc;
             String line = null;
             Scanner sc = new Scanner(System.in);
 
@@ -136,6 +137,16 @@ public class Peer {
 
                     // check that 'command' is supported.
                     switch (command) {
+                        case "register":
+                            this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", fileName, this.toString()));
+                            rc = this.fromSuperPeer.readInt();
+                            if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
+                            break;
+                        case "deregister":
+                            this.toSuperPeer.writeUTF(String.format("deregister 0;0;%s;%s", fileName, this.toString()));
+                            rc = this.fromSuperPeer.readInt();
+                            if (rc > 0) { this.log(String.format("Deregistration failed. Recieved error code %d", rc)); }
+                            break;
                         case "search":
                             // if this peer already contains file, save a communication call by doing nothing.
                             if (new File(String.format("%s/%s", this.fileDir, fileName)).exists()) {
@@ -152,7 +163,7 @@ public class Peer {
             }
             sc.close();
         } catch (Exception e) {
-            e.printStackTrace();
+            this.log("Quitting...");
         }
     }
 
@@ -166,7 +177,7 @@ public class Peer {
             int rc;
             for (File file : this.fileDir.listFiles()) {
                 if (file.isFile()) {
-                    this.log(String.format("Registering file '%s'...", file.getName()));
+                    // this.log(String.format("Registering file '%s'...", file.getName()));
                     // register with SuperPeer, which acts as a PA1 Index.
                     this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", file.getName(), this.toString()));
                     // capture response code
@@ -203,7 +214,7 @@ public class Peer {
             );
 
             // code for sending/receiving bytes over socket from adapted from: https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
-            this.log(String.format("Downloading '%s' from Peer %d...", message.getFileName(), message.getFullAddress()));
+            this.log(String.format("Downloading '%s' from (Leaf %s)...", message.getFileName(), target.toString()));
             int count;
             byte[] buffer = new byte[8192];
             while ((count = targetIn.read(buffer)) > 0) {
@@ -252,7 +263,8 @@ public class Peer {
             Message query = new Message(messageID, ttl, fileName);
             // send query to SuperPeer
             this.toSuperPeer.writeUTF(String.format("query %s", query.toString()));
-        } catch (IOException e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
         return this;
@@ -313,7 +325,7 @@ public class Peer {
 
     /** log - helper method for logging messages with a descriptive prefix. */
     public Peer log(String message) {
-        System.out.println(String.format("[P %s]: %s", this.getFullAddress(), message));
+        System.out.println(String.format("\n[P %s]: %s", this.getFullAddress(), message));
         return this;
     }
 
@@ -371,9 +383,9 @@ public class Peer {
 
         public void run() {
             try {
+                peer.log(String.format("Listening on %s...", peer.getFullAddress()));
                 while (true) {
                     // accept an incoming connection
-                    peer.log(String.format("Listening on %s...", peer.getFullAddress()));
                     Socket ps = this.peer.server.accept();
                     PeerHandler ph = new PeerHandler(this.peer, ps);
                     ph.start();
@@ -412,7 +424,8 @@ public class Peer {
                         // SuperPeer just forwarded a query hit message to you
                         //      syntax: 'queryhit <msgid;ttl;fileName;ip:port> <ip:port>'
                         Message msg = Message.parse(args);
-                        if (!peer.messageLog.get(msg.getID())) {
+                        this.peer.log(String.format("received 'queryhit %s %s' from SP", args, request[2]));
+                        if (!peer.messageLog.containsKey(msg.getID())) {
                             // we have not downloaded the file yet
                             this.peer.download(msg, PeerMetadata.parse(request[2]));
                         }

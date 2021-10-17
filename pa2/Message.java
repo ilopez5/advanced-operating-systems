@@ -58,7 +58,7 @@ public class Message {
 
     /* helper methods */
     public String toString() {
-        if (this.address.isEmpty()) {
+        if (this.address == null) {
             return String.format("%s;%d;%s", this.messageID, this.ttl, this.fileName);
         }
         return String.format("%s;%d;%s;%s:%d",
@@ -68,7 +68,8 @@ public class Message {
     public static Message parse(String message) {
         String[] msg = message.split(";");
         if (msg.length > 3) {
-            return new Message(msg[0], Integer.parseInt(msg[1]), msg[2], msg[3], Integer.parseInt(msg[4]));
+            PeerMetadata p = PeerMetadata.parse(msg[3]);
+            return new Message(msg[0], Integer.parseInt(msg[1]), msg[2], p.getAddress(), p.getPort());
         }
         return new Message(msg[0], Integer.parseInt(msg[1]), msg[2]);
     }
