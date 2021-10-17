@@ -1,4 +1,5 @@
 import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.*;
 import java.net.*;
 import java.io.*;
@@ -45,6 +46,7 @@ public class Peer {
     private int sequence;
     private int ttl;
     private ConcurrentHashMap<String, Boolean> messageLog;
+    private final ReentrantLock downloadLock = new ReentrantLock();
 
     // ServerPeer-related metadata
     private PeerMetadata superPeer;
@@ -202,6 +204,9 @@ public class Peer {
             DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
             DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
 
+            // handshake
+            targetOut.writeUTF(this.toString());
+
             // send the request to target for the given file
             start = Instant.now();
             targetOut.writeUTF(String.format("obtain %s", message.toString()));
@@ -214,21 +219,24 @@ public class Peer {
             );
 
             // code for sending/receiving bytes over socket from adapted from: https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
-            this.log(String.format("Downloading '%s' from (Leaf %s)...", message.getFileName(), target.toString()));
+            this.log(String.format("Downloading '%s' from (%s)...", message.getFileName(), target.toString()));
             int count;
             byte[] buffer = new byte[8192];
             while ((count = targetIn.read(buffer)) > 0) {
                 fileOut.write(buffer, 0, count-1);
             }
-            this.messageLog.put(message.toString(), true);
+
             end = Instant.now();
             timeElapsed = Duration.between(start, end);
             this.log(String.format("Download complete. (took %s)", this.pretty(timeElapsed)));
+            this.messageLog.put(message.getID(), true);
 
             // close sockets
             fileOut.close();
             targetSocket.close();
         } catch (Exception e) {
+            this.log("Caught an exception, ruh roh");
+            this.messageLog.put(message.toString(), false);
             e.printStackTrace();
         }
         return this;
@@ -325,7 +333,7 @@ public class Peer {
 
     /** log - helper method for logging messages with a descriptive prefix. */
     public Peer log(String message) {
-        System.out.println(String.format("\n[P %s]: %s", this.getFullAddress(), message));
+        System.out.println(String.format("[P %s]: %s", this.getFullAddress(), message));
         return this;
     }
 
@@ -353,6 +361,11 @@ public class Peer {
     /** toString - serializes the Peer */
     public String toString() {
         return this.metadata.toString();
+    }
+
+    /** hasSeen - checks if this SuperPeer has seen this message */
+    public boolean hasDownloaded(String messageID) {
+        return this.messageLog.getOrDefault(messageID, false);
     }
 
 
@@ -413,6 +426,9 @@ public class Peer {
                 DataInputStream fromPeer = new DataInputStream(this.peerSocket.getInputStream());
                 DataOutputStream toPeer = new DataOutputStream(this.peerSocket.getOutputStream());
 
+                // handshake
+                String peer = fromPeer.readUTF();
+
                 // receive peer request and parse
                 String[] request = fromPeer.readUTF().split("[ \t]+");
                 String command = request[0];
@@ -424,11 +440,13 @@ public class Peer {
                         // SuperPeer just forwarded a query hit message to you
                         //      syntax: 'queryhit <msgid;ttl;fileName;ip:port> <ip:port>'
                         Message msg = Message.parse(args);
-                        this.peer.log(String.format("received 'queryhit %s %s' from SP", args, request[2]));
-                        if (!peer.messageLog.containsKey(msg.getID())) {
+                        this.peer.log(String.format("received 'queryhit %s %s' from %s", args, request[2], peer));
+                        this.peer.downloadLock.lock();
+                        if (!this.peer.hasDownloaded(msg.getID())) {
                             // we have not downloaded the file yet
                             this.peer.download(msg, PeerMetadata.parse(request[2]));
                         }
+                        this.peer.downloadLock.unlock();
                         break;
                     case "obtain":
                         // another peer wants this file
@@ -436,7 +454,7 @@ public class Peer {
                         this.peer.upload(args, toPeer);
                         break;
                     default:
-                        peer.log(String.format("Received unknown command '%s'. Ignoring.", command));
+                        this.peer.log(String.format("Received unknown command '%s'. Ignoring.", command));
                         break;
                 }
                 this.peerSocket.close();
