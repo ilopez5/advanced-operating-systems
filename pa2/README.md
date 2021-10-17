@@ -6,7 +6,8 @@
 
 ## Peer Files
 Peer files are provided for 16 peers with 10 files each. There are duplicates
-across peers. Files are generated using [Gensort](http://www.ordinal.com/gensort.html)
+across peers. Files are generated using
+[Gensort](http://www.ordinal.com/gensort.html)
 and are **not actual mp4 files**. I know the instructions said to generate
 text files, these have text in them and are not binary files. These files are
 located in the `files/` directory and are numbered by port number 6000-6016.

@@ -21,7 +21,7 @@ public class Message {
     }
 
     /* getters and setters */
-    public String getMessageID() {
+    public String getID() {
         return this.messageID;
     }
 
@@ -43,6 +43,17 @@ public class Message {
 
     public String getFullAddress() {
         return String.format("%s:%d", this.address, this.port);
+    }
+
+    public Message setFullAddress(String fullAddress) {
+        this.address = fullAddress.split(":")[0];
+        this.port = Integer.parseInt(fullAddress.split(":")[1]);
+        return this;
+    }
+
+    public Message decrementTTL() {
+        this.ttl -= 1;
+        return this;
     }
 
     /* helper methods */

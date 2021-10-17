@@ -42,7 +42,6 @@ public class Peer {
     private File fileDir;
     private File config;
     private ServerSocket server;
-    private Set<String> registry;
     private int sequence;
     private int ttl;
     private ConcurrentHashMap<String, Boolean> messageLog;
@@ -56,13 +55,14 @@ public class Peer {
     /* peer constructor */
     public Peer(String address, File fileDirectory, File config, int ttl) {
         try {
-            this.registry = ConcurrentHashMap.newKeySet();
             this.messageLog = new ConcurrentHashMap<String, Boolean>();
             this.metadata = PeerMetadata.parse(address);
             this.fileDir = fileDirectory;
             this.config = config;
             this.sequence = 0;
             this.ttl = ttl;
+
+            this.getSuperPeer();
 
             // opens a ServerSocket for other peers to connect to
             this.server = new ServerSocket(this.metadata.getPort());
@@ -83,7 +83,7 @@ public class Peer {
             Peer peer = new Peer(args[0], new File(args[1]), new File(args[2]), 10);
 
             // look into file directory and store records of all my files
-            peer.initialize();
+            peer.register();
 
             /**
              *  EventListener section:
@@ -150,38 +150,28 @@ public class Peer {
                     }
                 }
             }
-
-            // clean up
             sc.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    /** initialize - finds SuperPeer, then registers all files */
-    public void initialize() {
-        this.getSuperPeer();
-        this.register();
-    }
-
     /** register - goes through given directory and registers all the files within */
     public Peer register() {
         try {
+            // initial handshake
+            this.toSuperPeer.writeUTF(this.toString());
+
             // register files in directory to our in-memory registry
             int rc;
             for (File file : this.fileDir.listFiles()) {
                 if (file.isFile()) {
-                    this.log(String.format("Registering file '%s'", file.getName()));
-                    // add file to Peer in-memory registry
-                    this.registry.add(file.getName());
+                    this.log(String.format("Registering file '%s'...", file.getName()));
                     // register with SuperPeer, which acts as a PA1 Index.
-                    this.toSuperPeer.writeUTF(
-                        String.format("register %s %s", file.getName(), this.toString())
-                    );
+                    this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", file.getName(), this.toString()));
+                    // capture response code
                     rc = this.fromSuperPeer.readInt();
-                    if (rc > 0) {
-                        this.log(String.format("Registration failed. Recieved error code %d", rc));
-                    }
+                    if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
                 }
             }
         } catch (IOException e) {
@@ -191,13 +181,13 @@ public class Peer {
     }
 
     /** download - given a message containing the Peer that has file, download it */
-    private Peer download(Message message) {
+    public Peer download(Message message, PeerMetadata target) {
         try {
             Instant start, end;
             Duration timeElapsed;
 
             // open sockets to leaf peer
-            Socket targetSocket = new Socket(message.getAddress(), message.getPort());
+            Socket targetSocket = new Socket(target.getAddress(), target.getPort());
             DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
             DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
 
@@ -234,7 +224,7 @@ public class Peer {
     }
 
     /** upload - given a message and an output stream, writes to it */
-    private Peer upload(String message, DataOutputStream out) {
+    public Peer upload(String message, DataOutputStream out) {
         try {
             Message msg = Message.parse(message);
             DataInputStream in = new DataInputStream(
@@ -261,7 +251,7 @@ public class Peer {
             String messageID = String.format("%s-%d", this.getFullAddress(), sequenceID);
             Message query = new Message(messageID, ttl, fileName);
             // send query to SuperPeer
-            this.toSuperPeer.writeUTF(query.toString());
+            this.toSuperPeer.writeUTF(String.format("query %s", query.toString()));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -286,7 +276,7 @@ public class Peer {
     }
 
     /** getSuperPeer - either returns an already determined SuperPeer, or finds it in config */
-    public Peer getSuperPeer() {
+    public PeerMetadata getSuperPeer() {
         try {
             if (this.superPeer == null) {
                 // determine who my SuperPeer is by reading config file
@@ -318,7 +308,7 @@ public class Peer {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return this;
+        return this.metadata;
     }
 
     /** log - helper method for logging messages with a descriptive prefix. */
@@ -383,7 +373,7 @@ public class Peer {
             try {
                 while (true) {
                     // accept an incoming connection
-                    peer.log(String.format("Listening on %s...", peer.metadata.getFullAddress()));
+                    peer.log(String.format("Listening on %s...", peer.getFullAddress()));
                     Socket ps = this.peer.server.accept();
                     PeerHandler ph = new PeerHandler(this.peer, ps);
                     ph.start();
@@ -420,11 +410,11 @@ public class Peer {
                 switch (command) {
                     case "queryhit":
                         // SuperPeer just forwarded a query hit message to you
-                        //  syntax: 'queryhit msgid;ttl;fileName;ip:port'
+                        //      syntax: 'queryhit <msgid;ttl;fileName;ip:port> <ip:port>'
                         Message msg = Message.parse(args);
-                        if (!peer.messageLog.get(msg.getMessageID())) {
+                        if (!peer.messageLog.get(msg.getID())) {
                             // we have not downloaded the file yet
-                            this.peer.download(msg);
+                            this.peer.download(msg, PeerMetadata.parse(request[2]));
                         }
                         break;
                     case "obtain":
@@ -479,13 +469,11 @@ public class Peer {
                     for (WatchEvent<?> event : events) {
                         if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             // a file was deleted so we deregister
-                            this.peer.registry.remove(event.context().toString());
-                            this.peer.toSuperPeer.writeUTF(String.format("deregister %s %s", event.context().toString(), this.peer));
+                            this.peer.toSuperPeer.writeUTF(String.format("deregister 0;0;%s;%s", event.context().toString(), this.peer));
                             this.peer.fromSuperPeer.readInt();
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
                             // a file was deleted so we deregister
-                            this.peer.registry.add(event.context().toString());
-                            this.peer.toSuperPeer.writeUTF(String.format("register %s %s", event.context().toString(), this.peer));
+                            this.peer.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", event.context().toString(), this.peer));
                             this.peer.fromSuperPeer.readInt();
                         }
                     }
