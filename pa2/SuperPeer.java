@@ -8,7 +8,6 @@ import java.io.*;
  *              network. Leaf peers, or just Peers, send queries to their respective
  *              SuperPeer, and expect to get back k query-hit messages, indicating
  *              which peers contain that message.
- *
  *              All network communications occur over TCP using Sockets. Thus,
  *              most communications are simply UTF string messages being passed
  *              back and forth.
@@ -20,16 +19,24 @@ public class SuperPeer {
     /* SuperPeer metadata */
     private PeerMetadata metadata;
     private ServerSocket server; // for communicating TO this SuperPeer
+    private ConcurrentHashMap<String, HashSet<PeerMetadata>> registry;
+    private List<String> history;
+    private ConcurrentHashMap<String, PeerMetadata> mappedHistory;
     private Set<PeerMetadata> neighbors; // for tracking SuperPeer neighbors
-    private Set<PeerMetadata> peers; // for tracking associated peers
+    private Set<PeerMetadata> leafs; // for tracking associated peers
     private File config;
+    private int historySize = 50;
 
     /* constructor */
     public SuperPeer(String address, File config) {
         try {
-            this.peers = ConcurrentHashMap.newKeySet();
+            this.registry = new ConcurrentHashMap<String, HashSet<PeerMetadata>>();
+            this.history = Collections.synchronizedList(new ArrayList<String>());
+            this.mappedHistory = new ConcurrentHashMap<String, PeerMetadata>();
+            // this.history.put("messages", new LinkedHashMap<String, PeerMetadata>());
+            this.leafs = ConcurrentHashMap.newKeySet();
             this.neighbors = ConcurrentHashMap.newKeySet();
-            this.metadata = PeerMetadata.parseString(address);
+            this.metadata = PeerMetadata.parse(address);
             this.config = config;
 
             // create new socket for connections
@@ -48,73 +55,101 @@ public class SuperPeer {
     public static void main(String[] args) {
         // construct a new SuperPeer object
         SuperPeer superPeer = new SuperPeer(args[0], new File(args[1]));
-
-        // read config file to initialize
-        superPeer.initialize();
-
-        superPeer.log(String.format("Listening on %s:%d...",
-                    superPeer.getAddress(), superPeer.getPort()));
-
-        // begin listening for incoming requests
-        superPeer.listen();
+        superPeer.initialize().listen();
     }
 
     /**
-     *  initialize - reads a config file following a specific format, and stores
-     *              any information relevant to THIS SuperPeer.
-     *
+     *  initialize - reads a config file and stores relevant info to THIS SuperPeer
      *      Config Syntax: <type> <address:port> <address:port>
      *          - 'type' -> 's' or 'p' for SuperPeer and Peer, respectively
      *              - for type 's': the second peer is a SuperPeer neighbor
      *              - for type 'p': the second peer is a Peer for this SuperPeer
      */
-    private void initialize() {
+    public SuperPeer initialize() {
         try {
+            this.log(String.format("Listening on %s:%d...", this.getAddress(), this.getPort()));
             // read config file (e.g., all-to-all.config, linear.config)
-            FileInputStream fis = new FileInputStream(this.config);
-            Scanner sc = new Scanner(fis);
+            Scanner sc = new Scanner(new FileInputStream(this.config));
 
             // process each line
             while (sc.hasNextLine()) {
                 // parse and decompose line
                 String[] line = sc.nextLine().split(" ");
                 String type = line[0];
-                PeerMetadata peer = PeerMetadata.parseString(line[1]);
-                PeerMetadata other = PeerMetadata.parseString(line[2]);
+                PeerMetadata peer = PeerMetadata.parse(line[1]);
+                PeerMetadata other = PeerMetadata.parse(line[2]);
 
-                // handle accordingly
-                switch (type) {
-                    case "s":
-                        // SuperPeer definition
-                        if (this.equals(peer)) {
-                            // 'other' is neighbor to associate with this SuperPeer
+                if (this.equals(peer)) {
+                    switch (type) {
+                        case "s":
+                            // SuperPeer definition: 'other' is neighbor to associate with this SuperPeer
                             this.neighbors.add(other);
-                        }
-                        break;
-                    case "p":
-                        // peer definition
-                        if (this.equals(peer)) {
-                            // 'other' is peer to associate with this SuperPeer
-                            this.peers.add(other);
-                        }
-                        break;
-                    default:
-                        this.log(String.format("Unknown type '%s'. Ignoring...", type));
-                        break;
+                            break;
+                        case "p":
+                            // peer definition: 'other' is peer to associate with this SuperPeer
+                            this.leafs.add(other);
+                            break;
+                        default:
+                            this.log(String.format("Unknown type '%s'. Ignoring...", type));
+                            break;
+                    }
                 }
             }
             sc.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return this;
+    }
+
+    /** register - accepts a peer and a fileName. creates or updates entry in registry */
+    public int register(String fileName, PeerMetadata peer) {
+        try {
+            // check if this file has been registered before
+            if (this.registry.containsKey(fileName)) {
+                // it exists, acquire its known peer list and add this peer to it
+                HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
+                filePeerList.add(peer);
+            } else {
+                // does not exist, create a new entry with this peer associated to it
+                HashSet<PeerMetadata> filePeerList = new HashSet<PeerMetadata>();
+                filePeerList.add(peer);
+                this.registry.put(fileName, filePeerList);
+            }
+            this.log(String.format("Registered '%s' to Leaf Peer %s", fileName, peer.getFullAddress()));
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 1;
+        }
+    }
+
+    /** deregister - accepts a peer and a fileName. updates or removes entry from registry */
+    public int deregister(String fileName, PeerMetadata peer) {
+        try {
+            // only do work if file is registered
+            if (this.registry.containsKey(fileName)) {
+                HashSet<PeerMetadata> filePeerList = this.registry.get(fileName);
+                filePeerList.remove(peer);
+                this.log(String.format("Deregistered Peer %s from '%s'.", peer.toString(), fileName));
+                if (filePeerList.size() == 0) {
+                    // last peer removed from file's peer list, remove file from registry
+                    this.registry.remove(fileName);
+                    this.log(String.format("Deregistered '%s' entirely from Registry.", fileName));
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 1;
+        }
     }
 
     /**
-     *  listen - waits for incoming connections. upon receiving one, it spawns a
-     *          PeerHandler thread to handle this specific request from a Peer
-     *          or SuperPeer.
+     *  listen - waits for incoming connections, upon receiving one, spawns a
+     *          PeerHandler thread to handle this specific request
      */
-    public void listen() {
+    public SuperPeer listen() {
         try {
             while (true) {
                 // accept an incoming connection
@@ -125,53 +160,78 @@ public class SuperPeer {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return this;
     }
 
-    /**
-     *  log - helper method for logging messages with a descriptive prefix.
-     */
-    private void log(String message) {
+    /** log - helper method for logging messages with a descriptive prefix */
+    public SuperPeer log(String message) {
         System.out.println(String.format("[SP %s]: %s", this.metadata.toString(), message));
+        return this;
     }
 
-    /**
-     *  getAddress - we store the IPv4 address in a PeerMetadata object. this
-     *              method wraps the getAddress() method of that object. Forgive
-     *              the added obfuscation for better readability.
-     */
+    /** getAddress - returns IPv4 address of this SuperPeer */
     public String getAddress() {
         return this.metadata.getAddress();
     }
 
-    /**
-     *  getPort - we store the exposed port in a PeerMetadata object. this
-     *          method wraps the getPort() method of that object. Forgive
-     *          the added obfuscation for better readability.
-     */
+    /** getPort - returns server port of this SuperPeer */
     public int getPort() {
         return this.metadata.getPort();
     }
 
-    /**
-     *  equals - checks equality between this SuperPeer and another one by
-     *          comparing their metadata (currently: address and port).
-     */
+    /** equals - checks equality between this SuperPeer and another one */
     public boolean equals(PeerMetadata other) {
         return this.metadata.equals(other);
     }
 
+    /** isLeaf - checks if a Peer (IPv4:port) is a leaf of this SuperPeer */
+    public boolean isLeaf(PeerMetadata peer) {
+        return this.leafs.contains(peer);
+    }
+
+    /** isNeighbor - checks if a Peer (IPv4:port) is a SP Neighbor of this SuperPeer */
+    public boolean isNeighbor(PeerMetadata peer) {
+        return this.neighbors.contains(peer);
+    }
+
+    /** hasFile - checks if a file is registered with this SuperPeer */
+    public boolean hasFile(String fileName) {
+        return this.registry.contains(fileName);
+    }
+
+    /** hasSeen - checks if this SuperPeer has seen this message */
+    public boolean hasSeen(String messageID) {
+        return this.history.contains(messageID);
+    }
+
+    /** record - logs message then keeps size in check */
+    public SuperPeer record(String messageID, PeerMetadata peer) {
+        this.history.add(messageID);
+        this.mappedHistory.put(messageID, peer);
+        if (this.history.size() > this.historySize) {
+            // history got too large, remove oldest entry
+            String mid = this.history.remove(0);
+            this.mappedHistory.remove(mid);
+        }
+        return this;
+    }
+
+
     /**
-     *  Nested Class(es):
+     *  Nested Class:
      *
      *      PeerHandler - this class handles any communication from incoming
-     *                  Peer or SuperPeer requests. it runs on its own thread,
+     *                  leaf Peer requests. it runs on its own thread,
      *                  receives the request over TCP, parses it, executes it,
-     *                  and returns a response (if necessary).
+     *                  and returns a response (if necessary). the connection
+     *                  stays open to the leaf peer.
      */
     private class PeerHandler extends Thread {
-        /* references to this peer and the socket for the incoming peer */
-        private SuperPeer superPeer;
-        private Socket peerSocket; // used to communicate with requestor
+        /* metadata */
+        private SuperPeer superPeer; // reference to this SuperPeer
+        private Socket peerSocket; // used to communicate with requester
+        private DataInputStream fromPeer;
+        private DataOutputStream toPeer;
 
         /* constructor */
         public PeerHandler(SuperPeer superPeer, Socket socket) {
@@ -181,43 +241,149 @@ public class SuperPeer {
 
         public void run() {
             try {
-                // 'dataIn' is for requests received FROM THE PEER
-                // 'dataOut' is for responses we send TO THE PEER
-                DataInputStream fromPeer = new DataInputStream(this.peerSocket.getInputStream());
-                DataOutputStream toPeer = new DataOutputStream(this.peerSocket.getOutputStream());
+                // open some data streams
+                this.fromPeer = new DataInputStream(this.peerSocket.getInputStream());
+                this.toPeer = new DataOutputStream(this.peerSocket.getOutputStream());
 
-                // receive address:port for Peer's server socket
-                PeerMetadata peer = PeerMetadata.parseString(fromPeer.readUTF());
+                // initial handshake
+                PeerMetadata peer = PeerMetadata.parse(this.fromPeer.readUTF());
+
+                // check if this is a SuperPeer calling
+                if (this.superPeer.isNeighbor(peer)) {
+                    // this is a SuperPeer request, so we will handle separately
+                    // then close the connection once complete.
+                    this.handleSuperPeer(peer);
+                    this.peerSocket.close();
+                    return;
+                } else if (!this.superPeer.isLeaf(peer)) {
+                    // ERROR: some other SuperPeer's leaf node is contacting me.
+                    this.superPeer.log("Received request from a foreign leaf peer. Stop.");
+                    this.peerSocket.close();
+                    return;
+                }
+
+                this.superPeer.log(String.format("Connected with Peer %s", peer));
 
                 // parse a command from peer in the form of "command fileName"
-                //      e.g., "search Moana.txt"
-                String[] request = fromPeer.readUTF().split("[ \t]+");
-                if (request.length > 0) {
-    //                     String command = request[0];
-    //                     String fileName = request[1];
+                //      e.g., "query msgid;ttl;filename;ipv4:port"
+                while (true) {
+                    String[] request = fromPeer.readUTF().split("[ \t]+");
+                    String command = request[0];
+                    Message message = Message.parse(request[1]);
 
-    //                     // handle command appropriately
-    //                     int rc;
-    //                     switch (command) {
-    //                         case "register":
-    //                             rc = this.index.register(fileName, this.peer);
-    //                             toPeer.writeInt(rc);
-    //                             break;
-    //                         case "search":
-    //                             String response = this.index.search(fileName).toString();
-    //                             toPeer.writeUTF(response);
-    //                             break;
-    //                         case "deregister":
-    //                             rc = this.index.deregister(fileName, this.peer);
-    //                             toPeer.writeInt(rc);
-    //                             break;
-    //                         default:
-    //                             System.out.println(String.format("[Index]: Received unknown command '%s'. Ignoring.", command));
-    //                             break;
-    //                     }
+                    int rc;
+                    switch (command) {
+                        case "register":
+                            // received a register command from a leaf node
+                            rc = this.superPeer.register(message.getFileName(), peer);
+                            toPeer.writeInt(rc);
+                            break;
+                        case "deregister":
+                            // receive a deregister command from a leaf node
+                            rc = this.superPeer.deregister(message.getFileName(), peer);
+                            toPeer.writeInt(rc);
+                            break;
+                        case "query":
+                            // check if this query is directly from our leaf and if we have the file
+                            if (this.superPeer.hasFile(message.getFileName())) {
+                                // other leaf peers have this file
+                                HashSet<PeerMetadata> leafs = this.superPeer.registry.get(message.getFileName());
+                                Socket reqSock = new Socket(peer.getAddress(), peer.getPort());
+                                DataOutputStream toRequester = new DataOutputStream(reqSock.getOutputStream());
+                                for (PeerMetadata l : leafs) {
+                                    // send queryhit back to leaf requester, one for each leaf
+                                    this.superPeer.log(String.format("%s has this file.", l));
+                                    toRequester.writeUTF(String.format("queryhit %s %s", message, l));
+                                }
+                                reqSock.close();
+                            }
+
+                            // log this message as being received
+                            this.superPeer.record(message.getID(), peer);
+
+                            // next, forward message to other SuperPeers
+                            if (message.getTTL() > 0) {
+                                message.decrementTTL();
+                                for (PeerMetadata neighbor : this.superPeer.neighbors) {
+                                    // forward the message to each, with the TTL decremented
+                                    Socket nSock = new Socket(neighbor.getAddress(), neighbor.getPort());
+                                    DataOutputStream toNeighbor = new DataOutputStream(nSock.getOutputStream());
+                                    toNeighbor.writeUTF(
+                                        String.format("query %s %s", message, this.superPeer)
+                                    );
+                                    nSock.close();
+                                }
+                            }
+                            break;
+                        default:
+                            this.superPeer.log(String.format("Received unknown command '%s'. Ignoring.", command));
+                            break;
+                    }
                 }
-                this.peerSocket.close();
             } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void handleSuperPeer(PeerMetadata peer) {
+            try {
+                //
+                String[] request = this.fromPeer.readUTF().split("[ \t]+");
+                String command = request[0];
+                Message message = Message.parse(request[1]);
+                PeerMetadata sender = PeerMetadata.parse(request[2]);
+
+                switch (command) {
+                    case "query":
+                        // only do work if this message has not been seen before
+                        if (!this.superPeer.hasSeen(message.getID())) {
+                            // log it and make sure history size is okay
+                            this.superPeer.record(message.getID(), sender);
+
+                            // check if this file is in one of our leaf nodes
+                            if (this.superPeer.hasFile(message.getFileName())) {
+                                // other leaf peers have this file
+                                HashSet<PeerMetadata> leafs = this.superPeer.registry.get(message.getFileName());
+                                Socket reqSock = new Socket(peer.getAddress(), peer.getPort());
+                                DataOutputStream toRequester = new DataOutputStream(reqSock.getOutputStream());
+
+                                for (PeerMetadata l : leafs) {
+                                    // send queryhit back to leaf requester, one for each leaf
+                                    this.superPeer.log(String.format("%s has this file.", l));
+                                    toRequester.writeUTF(String.format("queryhit %s %s", message, l));
+                                }
+                                reqSock.close();
+                            }
+
+                            // next, forward message to other SuperPeers
+                            if (message.getTTL() > 0) {
+                                message.decrementTTL();
+                                for (PeerMetadata neighbor : this.superPeer.neighbors) {
+                                    // forward the message to each, with the TTL decremented
+                                    Socket nSock = new Socket(neighbor.getAddress(), neighbor.getPort());
+                                    DataOutputStream toNeighbor = new DataOutputStream(nSock.getOutputStream());
+                                    toNeighbor.writeUTF(
+                                        String.format("query %s %s", message, this.superPeer)
+                                    );
+                                    nSock.close();
+                                }
+                            }
+                        }
+                        break;
+                    case "queryhit":
+                        PeerMetadata back = this.superPeer.mappedHistory.get(message.getID());
+                        Socket bSock = new Socket(back.getAddress(), back.getPort());
+                        DataOutputStream toNeighbor = new DataOutputStream(bSock.getOutputStream());
+                        toNeighbor.writeUTF(
+                            String.format("queryhit %s %s", message, sender)
+                        );
+                        bSock.close();
+                        break;
+                    default:
+                        this.superPeer.log(String.format("Received unknown command '%s'. Ignoring.", command));
+                        break;
+                }
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
