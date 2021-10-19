@@ -1,0 +1,121 @@
+ismael@leviathan cs550/assignments/pa2 on  master
+Ω >> java SuperPeer 127.0.0.1:5000 all-to-all.simple.config
+[SP 127.0.0.1:5000]: Listening on 127.0.0.1:5000...
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:6001)
+[SP 127.0.0.1:5000]: Connected with Peer 127.0.0.1:6001
+[SP 127.0.0.1:5000]: Registered 'Megamind.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'Moana.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'AboutTime.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'Chef.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'Tenet.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'TheShawshankRedemption.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'Moneyball.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'SpaceCowboys.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'Warrior.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Registered 'Inception.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Received 'query 127.0.0.1:6001-0;10;Coco.mp4' from (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: New Message -> Recording '127.0.0.1:6001-0'...
+[SP 127.0.0.1:5000]: Forwarding 'query 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:5000' to (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: Forwarding 'query 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:5000' to (127.0.0.1:5002)
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: Received 'queryhit 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:6003' from 127.0.0.1:6003
+[SP 127.0.0.1:5000]: forwarding back to (127.0.0.1:6001)
+[SP 127.0.0.1:5000]: Registered 'Coco.mp4' to (Leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5002)
+[SP 127.0.0.1:5000]: Received 'query 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:5002' from 127.0.0.1:5002
+[SP 127.0.0.1:5000]: New Message -> Recording '127.0.0.1:6005-0'...
+[SP 127.0.0.1:5000]: Sending back 'queryhit 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:6001' to 127.0.0.1:5002.
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: Received 'query 127.0.0.1:6005-0;8;Coco.mp4 127.0.0.1:5001' from 127.0.0.1:5001
+[SP 127.0.0.1:5000]: Messaged already seen -> Dropped.
+[SP 127.0.0.1:5000]: Forwarding 'query 127.0.0.1:6005-0;8;Coco.mp4 127.0.0.1:5000' to (127.0.0.1:5001)
+
+ismael@leviathan cs550/assignments/pa2 on  master
+Ω >> java SuperPeer 127.0.0.1:5001 all-to-all.simple.config
+[SP 127.0.0.1:5001]: Listening on 127.0.0.1:5001...
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:6003)
+[SP 127.0.0.1:5001]: Connected with Peer 127.0.0.1:6003
+[SP 127.0.0.1:5001]: Registered 'ThePrestige.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'Megamind.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'EuroVision.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'Chef.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'Coco.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'LifeIsBeautiful.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'DjangoUnchained.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'SavingPrivateRyan.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'TheShawshankRedemption.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Registered 'Inception.mp4' to (Leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: Received 'query 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:5000' from 127.0.0.1:5000
+[SP 127.0.0.1:5001]: New Message -> Recording '127.0.0.1:6001-0'...
+[SP 127.0.0.1:5001]: Sending back 'queryhit 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:6003' to 127.0.0.1:5000.
+[SP 127.0.0.1:5001]: Forwarding 'query 127.0.0.1:6001-0;8;Coco.mp4 127.0.0.1:5001' to (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: Received 'query 127.0.0.1:6001-0;8;Coco.mp4 127.0.0.1:5002' from 127.0.0.1:5002
+[SP 127.0.0.1:5001]: Messaged already seen -> Dropped.
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: Received 'query 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:5002' from 127.0.0.1:5002
+[SP 127.0.0.1:5001]: New Message -> Recording '127.0.0.1:6005-0'...
+[SP 127.0.0.1:5001]: Sending back 'queryhit 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:6003' to 127.0.0.1:5002.
+[SP 127.0.0.1:5001]: Forwarding 'query 127.0.0.1:6005-0;8;Coco.mp4 127.0.0.1:5001' to (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: Received 'query 127.0.0.1:6005-0;8;Coco.mp4 127.0.0.1:5000' from 127.0.0.1:5000
+[SP 127.0.0.1:5001]: Messaged already seen -> Dropped.
+
+ismael@leviathan cs550/assignments/pa2 on  master
+Ω >> java SuperPeer 127.0.0.1:5002 all-to-all.simple.config
+[SP 127.0.0.1:5002]: Listening on 127.0.0.1:5002...
+[SP 127.0.0.1:5002]: Handshake with (127.0.0.1:6005)
+[SP 127.0.0.1:5002]: Connected with Peer 127.0.0.1:6005
+[SP 127.0.0.1:5002]: Registered 'Ironman.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'TheAvengers.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'Thor.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'TheSandlot.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'CaptainAmerica.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'Warrior.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'Narnia.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'Inception.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'TheLionKing.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Registered 'BlackWidow.mp4' to (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5002]: Received 'query 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:5000' from 127.0.0.1:5000
+[SP 127.0.0.1:5002]: New Message -> Recording '127.0.0.1:6001-0'...
+[SP 127.0.0.1:5002]: Forwarding 'query 127.0.0.1:6001-0;8;Coco.mp4 127.0.0.1:5002' to (127.0.0.1:5001)
+[SP 127.0.0.1:5002]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5002]: Received 'query 127.0.0.1:6001-0;8;Coco.mp4 127.0.0.1:5001' from 127.0.0.1:5001
+[SP 127.0.0.1:5002]: Messaged already seen -> Dropped.
+[SP 127.0.0.1:5002]: Received 'query 127.0.0.1:6005-0;10;Coco.mp4' from (Leaf 127.0.0.1:6005).
+[SP 127.0.0.1:5002]: New Message -> Recording '127.0.0.1:6005-0'...
+[SP 127.0.0.1:5002]: Forwarding 'query 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:5002' to (127.0.0.1:5001)
+[SP 127.0.0.1:5002]: Forwarding 'query 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:5002' to (127.0.0.1:5000)
+[SP 127.0.0.1:5002]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5002]: Received 'queryhit 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:6003' from 127.0.0.1:6003
+[SP 127.0.0.1:5002]: forwarding back to (127.0.0.1:6005)
+[SP 127.0.0.1:5002]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5002]: Received 'queryhit 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:6001' from 127.0.0.1:6001
+[SP 127.0.0.1:5002]: forwarding back to (127.0.0.1:6005)
+[SP 127.0.0.1:5002]: Registered 'Coco.mp4' to (Leaf 127.0.0.1:6005).
+
+ismael@leviathan cs550/assignments/pa2 on  master
+Ω >> java Peer 127.0.0.1:6001 files/peer6001 all-to-all.simple.config
+[P 127.0.0.1:6001]: Listening on 127.0.0.1:6001...
+(p2p-cli) => search Coco.mp4
+(p2p-cli) => [P 127.0.0.1:6001]: received 'queryhit 127.0.0.1:6001-0;9;Coco.mp4 127.0.0.1:6003' from 127.0.0.1:5000
+[P 127.0.0.1:6001]: Downloading 'Coco.mp4' from (127.0.0.1:6003)...
+[P 127.0.0.1:6001]: Download complete. (took 741000 ns)
+
+ismael@leviathan cs550/assignments/pa2 on  master
+Ω >> java Peer 127.0.0.1:6003 files/peer6003 all-to-all.simple.config
+[P 127.0.0.1:6003]: Listening on 127.0.0.1:6003...
+(p2p-cli) => search Coco.mp4
+[P 127.0.0.1:6003]: 'Coco.mp4' is already here. Ignoring.
+(p2p-cli) =>
+
+ismael@leviathan cs550/assignments/pa2 on  master
+Ω >> java Peer 127.0.0.1:6005 files/peer6005 all-to-all.simple.config
+[P 127.0.0.1:6005]: Listening on 127.0.0.1:6005...
+(p2p-cli) => search Coco.mp4
+(p2p-cli) => [P 127.0.0.1:6005]: received 'queryhit 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:6003' from 127.0.0.1:5002
+[P 127.0.0.1:6005]: Downloading 'Coco.mp4' from (127.0.0.1:6003)...
+[P 127.0.0.1:6005]: received 'queryhit 127.0.0.1:6005-0;9;Coco.mp4 127.0.0.1:6001' from 127.0.0.1:5002
+[P 127.0.0.1:6005]: Download complete. (took 742000 ns)
