@@ -54,6 +54,10 @@ public class Peer {
     private DataInputStream fromSuperPeer;
     private DataOutputStream toSuperPeer;
 
+    // other
+    private EventListener eventListener;
+    private PeerListener peerListener;
+
     /* peer constructor */
     public Peer(String address, File fileDir, File config, int ttl) {
         try {
@@ -69,6 +73,27 @@ public class Peer {
             // opens a ServerSocket for other peers to connect to
             this.server = new ServerSocket(this.address.getPort());
             this.server.setReuseAddress(true);
+
+            /**
+             *  PeerServer section:
+             *      spawns a PeerListener thread that listens for any incoming
+             *      peer connections. Upon recieving a connection, the PeerListener
+             *      spawns a PeerHandler thread to deal with it.
+             */
+            this.peerListener = new PeerListener(this);
+            this.peerListener.start();
+
+            /**
+             *  EventListener section:
+             *      spawns an EventListener thread that watches for any changes
+             *      to the given directory. if new file, registers it. if a file
+             *      is deleted, deregisters it. if modified, update network
+             */
+            this.eventListener = new EventListener(this);
+            this.eventListener.start();
+
+            // look into file directory and store records of all my files
+            this.registerDirectory();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -77,49 +102,28 @@ public class Peer {
     /**
      *  program usage:
      *          $ java Peer <address:port> <file-dir> <topology-config>
-     *    e.g., $ java Peer 127.0.0.1:6000 files/peer1/ linear.config
+     *    e.g., $ java Peer 127.0.0.1:6000 files/peer6001 linear.config
      */
     public static void main(String[] args) {
         try {
             // parse program arguments and init an object of this class
-            Peer peer = new Peer(args[0], new File(args[1]), new File(args[2]), 10);
+            Peer peer = new Peer(
+                args[0],
+                new File(args[1]),
+                new File(args[2]),
+                10
+            );
 
-            /**
-             *  EventListener section:
-             *      spawns an EventListener thread that watches for any changes
-             *      to the given directory. if new file, registers it. if a file
-             *      is deleted, deregisters it. if modified, do nothing.
-             */
-            EventListener el = peer.new EventListener(peer);
-            el.start();
+            // cli runs until program is interrupted or 'exit' is entered
+            peer.cli().close();
 
-            /**
-             *  PeerServer section:
-             *      spawns a PeerListener thread that listens for any incoming
-             *      peer connections. Upon recieving a connection, the PeerListener
-             *      spawns a PeerHandler thread to deal with it.
-             */
-            PeerListener pl = peer.new PeerListener(peer);
-            pl.start();
-
-            // look into file directory and store records of all my files
-            peer.registerDirectory();
-
-            /**
-             *  User CLI Section:
-             *      runs until program is interrupted or 'exit' is entered
-             */
-            peer.cli();
-
-            // clean up
-            peer.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     /** cli - provides the command line interface for interactive user input */
-    public void cli() {
+    public Peer cli() {
         try {
             int rc;
             String line = null;
@@ -167,9 +171,11 @@ public class Peer {
                 }
             }
             sc.close();
-        } catch (Exception e) {
             this.log("Quitting...");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+        return this;
     }
 
     /** registerDirectory - goes through given directory and registers all the files within */
@@ -246,7 +252,7 @@ public class Peer {
     /** upload - given a message and an output stream, writes to it */
     public Peer upload(String message, DataOutputStream out) {
         try {
-            Message msg = Message.parse(message);
+            Message msg = new Message(message);
             DataInputStream in = new DataInputStream(
                 new FileInputStream(
                     String.format("%s/%s", this.fileDir.getPath(), msg.getFileName())
@@ -325,6 +331,7 @@ public class Peer {
         try {
             this.spSocket.close();
             this.server.close();
+            this.eventListener.observer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -399,7 +406,7 @@ public class Peer {
                     ph.start();
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                this.peer.log("Closing PeerListener.");
             }
         }
     }
@@ -434,7 +441,7 @@ public class Peer {
                     case "queryhit":
                         // SuperPeer just forwarded a query hit message to you
                         //      syntax: 'queryhit <msgid;ttl;fileName;ip:port> <ip:port>'
-                        Message msg = Message.parse(args);
+                        Message msg = new Message(args);
                         this.peer.log(String.format("received 'queryhit %s %s' from %s", args, request[2], peer));
                         this.peer.downloadLock.lock();
                         if (!this.peer.hasDownloaded(msg.getID())) {
@@ -485,8 +492,8 @@ public class Peer {
         }
 
         public void run() {
-            while (true) {
-                try {
+            try {
+                while (true) {
                     // accept/take a new event
                     WatchKey watchKey = observer.take();
                     List<WatchEvent<?>> events = watchKey.pollEvents();
@@ -504,9 +511,9 @@ public class Peer {
                         }
                     }
                     watchKey.reset();
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
+            } catch (Exception e) {
+                this.peer.log("Closing Watchdog.");
             }
         }
     }

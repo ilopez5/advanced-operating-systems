@@ -27,6 +27,14 @@ public class SuperPeer {
     private File config;
     private int historySize = 50;
 
+    // colors
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_RED = "\u001B[31m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_YELLOW = "\u001B[33m";
+    public static final String ANSI_CYAN = "\u001B[36m";
+    public static final String ANSI_WHITE = "\u001B[37m";
+
     /* constructor */
     public SuperPeer(String address, File config) {
         try {
@@ -115,7 +123,8 @@ public class SuperPeer {
                 filePeerList.add(peer);
                 this.registry.put(fileName, filePeerList);
             }
-            this.log(String.format("Registered '%s' to (Leaf %s).", fileName, peer));
+            this.log(String.format("%sRegistered%s '%s' to (Leaf %s).",
+                            ANSI_GREEN, ANSI_RESET, fileName, peer));
             return 0;
         } catch (Exception e) {
             e.printStackTrace();
@@ -130,11 +139,12 @@ public class SuperPeer {
             if (this.registry.containsKey(fileName)) {
                 HashSet<IPv4> filePeerList = this.registry.get(fileName);
                 filePeerList.remove(peer);
-                this.log(String.format("Deregistered (Leaf %s) from '%s'.", peer, fileName));
+                this.log(String.format("%sDeregistered%s (Leaf %s) from '%s'.",
+                            ANSI_RED, ANSI_RESET, peer, fileName));
                 if (filePeerList.size() == 0) {
                     // last peer removed from file's peer list, remove file from registry
                     this.registry.remove(fileName);
-                    this.log(String.format("Deregistered '%s' entirely from Registry.", fileName));
+                    this.log(String.format("\t-> removing '%s' entirely.", fileName));
                 }
             }
             return 0;
@@ -164,7 +174,8 @@ public class SuperPeer {
 
     /** log - helper method for logging messages with a descriptive prefix */
     public SuperPeer log(String message) {
-        System.out.println(String.format("[SP %s]: %s", this.address.toString(), message));
+        System.out.println(String.format("[%sSP %s%s]: %s",
+                            ANSI_WHITE, this.address, ANSI_RESET, message));
         return this;
     }
 
@@ -268,14 +279,14 @@ public class SuperPeer {
                 }
 
                 this.peer = peer;
-                this.superPeer.log(String.format("Connected with Peer %s", this.peer));
+                this.superPeer.log(String.format("Connected with (Peer %s)", this.peer));
 
                 // parse a command from peer in the form of "command fileName"
                 //      e.g., "query msgid;ttl;filename;ipv4:port"
                 while (true) {
                     String[] request = fromPeer.readUTF().split("[ \t]+");
                     String command = request[0];
-                    Message message = Message.parse(request[1]);
+                    Message message = new Message(request[1]);
 
                     int rc;
                     switch (command) {
@@ -339,8 +350,12 @@ public class SuperPeer {
                             break;
                     }
                 }
+            } catch (EOFException e) {
+                this.superPeer.log(String.format("Connection with (%s) closed.", this.peer));
+                for (String file : this.superPeer.registry.keySet()) {
+                    this.superPeer.deregister(file, this.peer);
+                }
             } catch (Exception e) {
-                this.superPeer.log(String.format("Lost connection with (%s).", this.peer.toString()));
                 e.printStackTrace();
             }
         }
@@ -349,7 +364,7 @@ public class SuperPeer {
             try {
                 String[] request = this.fromPeer.readUTF().split("[ \t]+");
                 String command = request[0];
-                Message message = Message.parse(request[1]);
+                Message message = new Message(request[1]);
                 IPv4 sender = new IPv4(request[2]);
 
                 this.superPeer.log(String.format("Received '%s %s %s' from %s",

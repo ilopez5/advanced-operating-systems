@@ -6,6 +6,17 @@ public class Message {
     private int port;
 
     /* constructor(s) */
+    public Message(String message) {
+        String[] msg = message.split(";");
+        this.messageID = msg[0];
+        this.ttl = Integer.parseInt(msg[1]);
+        this.fileName = msg[2];
+        if (msg.length > 3) {
+            this.address = msg[3].split(":")[0];
+            this.port = Integer.parseInt(msg[3].split(":")[1]);
+        }
+    }
+
     public Message(String messageID, int ttl, String fileName) {
         this.messageID = messageID;
         this.ttl = ttl;
@@ -71,13 +82,5 @@ public class Message {
         }
         return String.format("%s;%d;%s;%s:%d",
             this.messageID, this.ttl, this.fileName, this.address, this.port);
-    }
-
-    public static Message parse(String message) {
-        String[] msg = message.split(";");
-        if (msg.length > 3) {
-            return new Message(msg[0], Integer.parseInt(msg[1]), msg[2], msg[3]);
-        }
-        return new Message(msg[0], Integer.parseInt(msg[1]), msg[2]);
     }
 }
