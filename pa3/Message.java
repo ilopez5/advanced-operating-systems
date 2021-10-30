@@ -12,6 +12,14 @@ public class Message {
         this.fileName = fileName;
     }
 
+    public Message(String messageID, int ttl, String fileName, String fullAddress) {
+        this.messageID = messageID;
+        this.ttl = ttl;
+        this.fileName = fileName;
+        this.address = fullAddress.split(":")[0];
+        this.port = Integer.parseInt(fullAddress.split(":")[1]);
+    }
+
     public Message(String messageID, int ttl, String fileName, String address, int port) {
         this.messageID = messageID;
         this.ttl = ttl;
@@ -68,8 +76,7 @@ public class Message {
     public static Message parse(String message) {
         String[] msg = message.split(";");
         if (msg.length > 3) {
-            PeerMetadata p = PeerMetadata.parse(msg[3]);
-            return new Message(msg[0], Integer.parseInt(msg[1]), msg[2], p.getAddress(), p.getPort());
+            return new Message(msg[0], Integer.parseInt(msg[1]), msg[2], msg[3]);
         }
         return new Message(msg[0], Integer.parseInt(msg[1]), msg[2]);
     }

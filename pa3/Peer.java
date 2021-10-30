@@ -26,10 +26,10 @@ import java.time.Instant;
  *          lastly, it will present a basic CLI for user interaction.
  *
  *          Accepted syntax:
- *              (p2p-cli) => <command> <fileName>
+ *              (peer-cli) => <command> <fileName>
  *
  *          e.g.,
- *              (p2p-cli) => search Inception.mp4
+ *              (peer-cli) => search Inception.mp4
  *
  *          Citations:
  *              [1] https://www.geeksforgeeks.org/socket-programming-in-java/
@@ -39,35 +39,35 @@ import java.time.Instant;
  */
 public class Peer {
     /* Peer metadata */
-    private PeerMetadata metadata;
-    private File fileDir;
-    private File config;
-    private ServerSocket server;
-    private int sequence;
-    private int ttl;
-    private ConcurrentHashMap<String, Boolean> messageLog;
+    private IPv4 address; // address:port
+    private File fileDir; // directory containing peer's files
+    private File config; // file containing static topology
+    private ServerSocket server; // socket for other's to communicate with
+    private int sequence; // keeps a local sequence number for message ids
+    private int ttl; // time-to-live default for all messages
+    private ConcurrentHashMap<String, Boolean> messageLog; // stores seen messages
     private final ReentrantLock downloadLock = new ReentrantLock();
 
     // ServerPeer-related metadata
-    private PeerMetadata superPeer;
-    private Socket spSocket;
+    private IPv4 superPeer; // address:port
+    private Socket spSocket; // socket for communicating with SuperPeer
     private DataInputStream fromSuperPeer;
     private DataOutputStream toSuperPeer;
 
     /* peer constructor */
-    public Peer(String address, File fileDirectory, File config, int ttl) {
+    public Peer(String address, File fileDir, File config, int ttl) {
         try {
             this.messageLog = new ConcurrentHashMap<String, Boolean>();
-            this.metadata = PeerMetadata.parse(address);
-            this.fileDir = fileDirectory;
-            this.config = config;
             this.sequence = 0;
+            this.address = new IPv4(address);
+            this.fileDir = fileDir;
+            this.config = config;
             this.ttl = ttl;
 
             this.getSuperPeer();
 
             // opens a ServerSocket for other peers to connect to
-            this.server = new ServerSocket(this.metadata.getPort());
+            this.server = new ServerSocket(this.address.getPort());
             this.server.setReuseAddress(true);
         } catch (Exception e) {
             e.printStackTrace();
@@ -103,7 +103,7 @@ public class Peer {
             pl.start();
 
             // look into file directory and store records of all my files
-            peer.register();
+            peer.registerDirectory();
 
             /**
              *  User CLI Section:
@@ -127,7 +127,7 @@ public class Peer {
 
             while (!"exit".equalsIgnoreCase(line)) {
                 // print a prompt to the user, then read input
-                System.out.print("(p2p-cli) => ");
+                System.out.print("(peer-cli) => ");
                 line = sc.nextLine();
 
                 // user input must have format: "command fileName"
@@ -140,22 +140,25 @@ public class Peer {
                     // check that 'command' is supported.
                     switch (command) {
                         case "register":
-                            this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", fileName, this.toString()));
+                            // the "Message" for this command does not require an ID or TTL
+                            this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", fileName, this));
                             rc = this.fromSuperPeer.readInt();
                             if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
                             break;
                         case "deregister":
-                            this.toSuperPeer.writeUTF(String.format("deregister 0;0;%s;%s", fileName, this.toString()));
+                            // the "Message" for this command does not require an ID or TTL
+                            this.toSuperPeer.writeUTF(String.format("deregister 0;0;%s;%s", fileName, this));
                             rc = this.fromSuperPeer.readInt();
                             if (rc > 0) { this.log(String.format("Deregistration failed. Recieved error code %d", rc)); }
                             break;
                         case "search":
-                            // if this peer already contains file, save a communication call by doing nothing.
+                            // if peer already contains file, save a communication call by ignoring request.
                             if (new File(String.format("%s/%s", this.fileDir, fileName)).exists()) {
                                 this.log(String.format("'%s' is already here. Ignoring.", fileName));
-                                continue;
+                            } else {
+                                // increment sequence (post-increment)
+                                this.query(this.sequence++, this.ttl, fileName);
                             }
-                            this.query(this.sequence++, this.ttl, fileName);
                             break;
                         default:
                             this.log(String.format("Unknown command '%s'. Ignoring.", command));
@@ -169,8 +172,8 @@ public class Peer {
         }
     }
 
-    /** register - goes through given directory and registers all the files within */
-    public Peer register() {
+    /** registerDirectory - goes through given directory and registers all the files within */
+    public Peer registerDirectory() {
         try {
             // initial handshake
             this.toSuperPeer.writeUTF(this.toString());
@@ -179,10 +182,8 @@ public class Peer {
             int rc;
             for (File file : this.fileDir.listFiles()) {
                 if (file.isFile()) {
-                    // this.log(String.format("Registering file '%s'...", file.getName()));
-                    // register with SuperPeer, which acts as a PA1 Index.
-                    this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", file.getName(), this.toString()));
-                    // capture response code
+                    // register with SuperPeer, which acts as a PA1 Index
+                    this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", file.getName(), this));
                     rc = this.fromSuperPeer.readInt();
                     if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
                 }
@@ -194,10 +195,10 @@ public class Peer {
     }
 
     /** download - given a message containing the Peer that has file, download it */
-    public Peer download(Message message, PeerMetadata target) {
+    public Peer download(Message message, IPv4 target) {
         try {
             Instant start, end;
-            Duration timeElapsed;
+            Duration duration;
 
             // open sockets to leaf peer
             Socket targetSocket = new Socket(target.getAddress(), target.getPort());
@@ -209,7 +210,7 @@ public class Peer {
 
             // send the request to target for the given file
             start = Instant.now();
-            targetOut.writeUTF(String.format("obtain %s", message.toString()));
+            targetOut.writeUTF(String.format("obtain %s", message));
 
             // for writing to our own file directory
             DataOutputStream fileOut = new DataOutputStream(
@@ -219,7 +220,7 @@ public class Peer {
             );
 
             // code for sending/receiving bytes over socket from adapted from: https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
-            this.log(String.format("Downloading '%s' from (%s)...", message.getFileName(), target.toString()));
+            this.log(String.format("Downloading '%s' from (%s)...", message.getFileName(), target));
             int count;
             byte[] buffer = new byte[8192];
             while ((count = targetIn.read(buffer)) > 0) {
@@ -227,8 +228,8 @@ public class Peer {
             }
 
             end = Instant.now();
-            timeElapsed = Duration.between(start, end);
-            this.log(String.format("Download complete. (took %s)", this.pretty(timeElapsed)));
+            duration = Duration.between(start, end);
+            this.log(String.format("Download complete. (took %s)", this.elapsed(duration)));
             this.messageLog.put(message.getID(), true);
 
             // close sockets
@@ -267,10 +268,9 @@ public class Peer {
     /** query - creates a Message, sends to SuperPeer */
     public Peer query(int sequenceID, int ttl, String fileName) {
         try {
-            String messageID = String.format("%s-%d", this.getFullAddress(), sequenceID);
+            String messageID = String.format("%s-%d", this, sequenceID);
             Message query = new Message(messageID, ttl, fileName);
-            // send query to SuperPeer
-            this.toSuperPeer.writeUTF(String.format("query %s", query.toString()));
+            this.toSuperPeer.writeUTF(String.format("query %s", query));
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -284,19 +284,8 @@ public class Peer {
      */
 
 
-    /** close - closes any sockets before Peer is terminated*/
-    public Peer close() {
-        try {
-            this.spSocket.close();
-            this.server.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return this;
-    }
-
     /** getSuperPeer - either returns an already determined SuperPeer, or finds it in config */
-    public PeerMetadata getSuperPeer() {
+    public IPv4 getSuperPeer() {
         try {
             if (this.superPeer == null) {
                 // determine who my SuperPeer is by reading config file
@@ -307,8 +296,8 @@ public class Peer {
                     String type = line[0];
                     if (type.equals("p")) {
                         // only care about p lines
-                        PeerMetadata superPeer = PeerMetadata.parse(line[1]);
-                        PeerMetadata peer = PeerMetadata.parse(line[2]);
+                        IPv4 superPeer = new IPv4(line[1]);
+                        IPv4 peer = new IPv4(line[2]);
 
                         if (this.equals(peer)) {
                             // this is us!
@@ -328,27 +317,28 @@ public class Peer {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return this.metadata;
+        return this.address;
+    }
+
+    /** close - closes any sockets before Peer is terminated*/
+    public Peer close() {
+        try {
+            this.spSocket.close();
+            this.server.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return this;
     }
 
     /** log - helper method for logging messages with a descriptive prefix. */
     public Peer log(String message) {
-        System.out.println(String.format("[P %s]: %s", this.getFullAddress(), message));
+        System.out.println(String.format("[P %s]: %s", this, message));
         return this;
     }
 
-    /** equals - compares this Peer's PeerMetadata with another's */
-    public boolean equals(PeerMetadata other) {
-        return this.metadata.equals(other);
-    }
-
-    /** getFullAddress - returns full IPv4 address and port number */
-    public String getFullAddress() {
-        return this.metadata.getFullAddress();
-    }
-
-    /** pretty - print the elapsed time with appropriate units */
-    public String pretty(Duration elapsed) {
+    /** elapsed - print the elapsed time with appropriate units */
+    public String elapsed(Duration elapsed) {
         if (elapsed.toMillis() < 1) {
             return String.format("%d ns", elapsed.toNanos());
         } else if (elapsed.toSeconds() < 1) {
@@ -360,7 +350,12 @@ public class Peer {
 
     /** toString - serializes the Peer */
     public String toString() {
-        return this.metadata.toString();
+        return this.address.toString();
+    }
+
+    /** equals - compares this Peer's PeerMetadata with another's */
+    public boolean equals(IPv4 other) {
+        return this.address.equals(other);
     }
 
     /** hasSeen - checks if this SuperPeer has seen this message */
@@ -396,7 +391,7 @@ public class Peer {
 
         public void run() {
             try {
-                peer.log(String.format("Listening on %s...", peer.getFullAddress()));
+                peer.log(String.format("Listening on %s...", peer));
                 while (true) {
                     // accept an incoming connection
                     Socket ps = this.peer.server.accept();
@@ -444,7 +439,7 @@ public class Peer {
                         this.peer.downloadLock.lock();
                         if (!this.peer.hasDownloaded(msg.getID())) {
                             // we have not downloaded the file yet
-                            this.peer.download(msg, PeerMetadata.parse(request[2]));
+                            this.peer.download(msg, new IPv4(request[2]));
                         }
                         this.peer.downloadLock.unlock();
                         break;
