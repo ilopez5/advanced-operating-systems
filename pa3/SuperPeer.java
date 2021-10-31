@@ -83,7 +83,7 @@ public class SuperPeer {
             while (sc.hasNextLine()) {
                 // parse and decompose line
                 String[] line = sc.nextLine().split(" ");
-                String other, type = line[0];
+                String type = line[0];
                 IPv4 peer;
 
                 switch (type) {
