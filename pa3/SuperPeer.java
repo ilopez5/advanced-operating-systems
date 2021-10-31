@@ -26,6 +26,7 @@ public class SuperPeer {
     private Set<String> leafs; // for tracking associated peers
     private File config;
     private int historySize = 50;
+    private ConsistencyModel model;
 
     // colors
     public static final String ANSI_RESET = "\u001B[0m";
@@ -82,24 +83,42 @@ public class SuperPeer {
             while (sc.hasNextLine()) {
                 // parse and decompose line
                 String[] line = sc.nextLine().split(" ");
-                String type = line[0];
-                IPv4 peer = new IPv4(line[1]);
-                String other = line[2];
+                String other, type = line[0];
+                IPv4 peer;
 
-                if (this.equals(peer)) {
-                    switch (type) {
-                        case "s":
-                            // SuperPeer definition: 'other' is neighbor to associate with this SuperPeer
-                            this.neighbors.add(other);
-                            break;
-                        case "p":
-                            // peer definition: 'other' is peer to associate with this SuperPeer
-                            this.leafs.add(other);
-                            break;
-                        default:
-                            this.log(String.format("Unknown type '%s'. Ignoring...", type));
-                            break;
-                    }
+                switch (type) {
+                    case "c":
+                        // this record is for consistency model
+                        switch (line[1]) {
+                            case "pull":
+                                this.model = ConsistencyModel.PULL;
+                                break;
+                            case "push":
+                                this.model = ConsistencyModel.PUSH;
+                                break;
+                            default:
+                                this.log(String.format("Consistency model should be 'push' or 'pull', got '%s'. Defaulting to 'push'...", line[1]));
+                                this.model = ConsistencyModel.PUSH;
+                                break;
+                        }
+                        break;
+                    case "s":
+                        // SuperPeer definition: 'other' is neighbor to associate with this SuperPeer
+                        peer = new IPv4(line[1]);
+                        if (this.equals(peer)) {
+                            this.neighbors.add(line[2]);
+                        }
+                        break;
+                    case "p":
+                        // peer definition: 'other' is peer to associate with this SuperPeer
+                        peer = new IPv4(line[1]);
+                        if (this.equals(peer)) {
+                            this.leafs.add(line[2]);
+                        }
+                        break;
+                    default:
+                        this.log(String.format("Unknown type '%s'. Ignoring...", type));
+                        break;
                 }
             }
             sc.close();

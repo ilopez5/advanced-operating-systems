@@ -12,6 +12,11 @@ import java.nio.file.WatchEvent;
 import java.time.Duration;
 import java.time.Instant;
 
+enum ConsistencyModel {
+    PUSH,
+    PULL
+}
+
 /**
  *  Peer -  this class defines a leaf peer in the P2P network. each peer can act
  *          as a server for other peers in addition to acting as a client for
@@ -47,6 +52,7 @@ public class Peer {
     private int ttl; // time-to-live default for all messages
     private ConcurrentHashMap<String, Boolean> messageLog; // stores seen messages
     private final ReentrantLock downloadLock = new ReentrantLock();
+    private ConsistencyModel model;
 
     // ServerPeer-related metadata
     private IPv4 superPeer; // address:port
@@ -68,7 +74,7 @@ public class Peer {
             this.config = config;
             this.ttl = ttl;
 
-            this.getSuperPeer();
+            this.parseConfig();
 
             // opens a ServerSocket for other peers to connect to
             this.server = new ServerSocket(this.address.getPort());
@@ -284,48 +290,6 @@ public class Peer {
         return this;
     }
 
-
-    /**
-     * HELPER METHODS
-     */
-
-
-    /** getSuperPeer - either returns an already determined SuperPeer, or finds it in config */
-    public IPv4 getSuperPeer() {
-        try {
-            if (this.superPeer == null) {
-                // determine who my SuperPeer is by reading config file
-                Scanner sc = new Scanner(new FileInputStream(this.config));
-                while (sc.hasNextLine()) {
-                    // parse and decompose line
-                    String[] line = sc.nextLine().split(" ");
-                    String type = line[0];
-                    if (type.equals("p")) {
-                        // only care about p lines
-                        IPv4 superPeer = new IPv4(line[1]);
-                        IPv4 peer = new IPv4(line[2]);
-
-                        if (this.equals(peer)) {
-                            // this is us!
-                            this.superPeer = superPeer;
-                            this.spSocket = new Socket(
-                                this.superPeer.getAddress(),
-                                this.superPeer.getPort()
-                            );
-                            this.fromSuperPeer = new DataInputStream(this.spSocket.getInputStream());
-                            this.toSuperPeer = new DataOutputStream(this.spSocket.getOutputStream());
-                            break;
-                        }
-                    }
-                }
-                sc.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return this.address;
-    }
-
     /** close - closes any sockets before Peer is terminated*/
     public Peer close() {
         try {
@@ -341,6 +305,63 @@ public class Peer {
     /** log - helper method for logging messages with a descriptive prefix. */
     public Peer log(String message) {
         System.out.println(String.format("[P %s]: %s", this, message));
+        return this;
+    }
+
+    /** parseConfig - determines SuperPeer and Consistency Model from config */
+    public Peer parseConfig() {
+        try {
+            // determine who my SuperPeer is by reading config file
+            Scanner sc = new Scanner(new FileInputStream(this.config));
+            while (sc.hasNextLine()) {
+                // parse and decompose line
+                String[] line = sc.nextLine().split(" ");
+                String type = line[0];
+                switch (type) {
+                    case "c":
+                        switch (line[1]) {
+                            case "pull":
+                                this.model = ConsistencyModel.PULL;
+                                break;
+                            case "push":
+                                this.model = ConsistencyModel.PUSH;
+                                break;
+                            default:
+                                this.log(String.format("Consistency model should be 'push' or 'pull', got '%s'. Defaulting to 'push'...", line[1]));
+                                this.model = ConsistencyModel.PUSH;
+                                break;
+                        }
+                        break;
+                    case "p":
+                        // only care about p lines
+                        IPv4 superPeer = new IPv4(line[1]);
+                        IPv4 peer = new IPv4(line[2]);
+
+                        if (this.equals(peer)) {
+                            // this is us!
+                            this.superPeer = superPeer;
+                            this.spSocket = new Socket(
+                                this.superPeer.getAddress(),
+                                this.superPeer.getPort()
+                            );
+                            this.fromSuperPeer = new DataInputStream(this.spSocket.getInputStream());
+                            this.toSuperPeer = new DataOutputStream(this.spSocket.getOutputStream());
+                            break;
+                        }
+                        break;
+                    case "s":
+                        // only applies to SuperPeer so we do nothing
+                        break;
+                    default:
+                        this.log(String.format("Unknown type '%s'. Ignoring...", type));
+                        this.model = ConsistencyModel.PUSH;
+                        break;
+                }
+            }
+            sc.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return this;
     }
 
@@ -365,7 +386,7 @@ public class Peer {
         return this.address.equals(other);
     }
 
-    /** hasSeen - checks if this SuperPeer has seen this message */
+    /** hasDownloaded - checks if this Peer has already downloaded file related to this message */
     public boolean hasDownloaded(String messageID) {
         return this.messageLog.getOrDefault(messageID, false);
     }
@@ -508,6 +529,12 @@ public class Peer {
                             // a file was deleted so we deregister
                             this.peer.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", event.context().toString(), this.peer));
                             this.peer.fromSuperPeer.readInt();
+                        } else {
+                            // file was modified
+                            if (this.peer.model == ConsistencyModel.PUSH) {
+                                // only broadcast invalidate message when the model is push.
+                                // TODO
+                            }
                         }
                     }
                     watchKey.reset();
