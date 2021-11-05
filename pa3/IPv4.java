@@ -3,7 +3,7 @@
  *          Peer and SuperPeers.
  */
 public class IPv4 {
-    /* metadata */
+    /* class members */
     private String address; // IPv4 address
     private int port; // refers to server port
 

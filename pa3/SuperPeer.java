@@ -262,7 +262,7 @@ public class SuperPeer {
      *                  stays open to the leaf peer.
      */
     private class PeerHandler extends Thread {
-        /* metadata */
+
         private SuperPeer superPeer; // reference to this SuperPeer
         private Socket peerSocket; // used to communicate with requester
         private DataInputStream fromPeer;

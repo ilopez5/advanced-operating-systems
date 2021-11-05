@@ -1,40 +1,24 @@
-import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.*;
+import java.nio.file.*;
 import java.util.*;
+import java.time.*;
 import java.net.*;
 import java.io.*;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchService;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchEvent;
-import java.time.Duration;
-import java.time.Instant;
-
-enum ConsistencyModel {
-    PUSH,
-    PULL
-}
 
 /**
  *  Peer -  this class defines a leaf peer in the P2P network. each peer can act
  *          as a server for other peers in addition to acting as a client for
  *          which users can interact with.
  *
- *          upon being run, this peer will spawn a PeerListener thread to provide
- *          the server functionality of recieving and handling incoming request.
- *
- *          additionally, it will automatically register all files in its
- *          given directory.
- *
- *          lastly, it will present a basic CLI for user interaction.
+ *          upon being run, this peer will:
+ *              1. spawn a PeerListener thread to provide server functionality
+ *              2. automatically register all files in its given directory.
+ *              3. present a basic CLI for user interaction.
  *
  *          Accepted syntax:
  *              (peer-cli) => <command> <fileName>
- *
- *          e.g.,
- *              (peer-cli) => search Inception.mp4
+ *        e.g., (peer-cli) => search Inception.mp4
  *
  *          Citations:
  *              [1] https://www.geeksforgeeks.org/socket-programming-in-java/
@@ -43,36 +27,49 @@ enum ConsistencyModel {
  *              [4] https://www.rgagnon.com/javadetails/java-detect-file-modification-event.html
  */
 public class Peer {
-    /* Peer metadata */
+    /* identification */
     private IPv4 address; // address:port
-    private File fileDir; // directory containing peer's files
+
+    /* filesystem-related */
+    private File peerDir; // peer's root directory (INFO: might be redundant)
+    private File ownedDir; // fileDir/owned directory containing owned files
+    private File downloadsDir; // fileDir/downloads directory containing downloaded files
     private File config; // file containing static topology
+
+    /* server-related */
     private ServerSocket server; // socket for other's to communicate with
+
+    /* message-related */
     private int sequence; // keeps a local sequence number for message ids
     private int ttl; // time-to-live default for all messages
     private ConcurrentHashMap<String, Boolean> messageLog; // stores seen messages
     private final ReentrantLock downloadLock = new ReentrantLock();
-    private ConsistencyModel model;
 
-    // ServerPeer-related metadata
+    /* consistency-related */
+    private ConsistencyModel model; // stores a 'push' or 'pull' consistency model
+    private int ttr; // ('pull' model only) stores time-to-refresh
+
+    // superpeer-related
     private IPv4 superPeer; // address:port
     private Socket spSocket; // socket for communicating with SuperPeer
     private DataInputStream fromSuperPeer;
     private DataOutputStream toSuperPeer;
 
-    // other
+    // nested class references
     private EventListener eventListener;
     private PeerListener peerListener;
 
     /* peer constructor */
     public Peer(String address, File fileDir, File config, int ttl) {
         try {
-            this.messageLog = new ConcurrentHashMap<String, Boolean>();
-            this.sequence = 0;
             this.address = new IPv4(address);
-            this.fileDir = fileDir;
+            this.peerDir = fileDir;
+            this.ownedDir = new File(this.peerDir, "owned");
+            this.downloadsDir = new File(this.peerDir, "downloads");
             this.config = config;
+            this.sequence = 0;
             this.ttl = ttl;
+            this.messageLog = new ConcurrentHashMap<String, Boolean>();
 
             this.parseConfig();
 
@@ -108,7 +105,7 @@ public class Peer {
     /**
      *  program usage:
      *          $ java Peer <address:port> <file-dir> <topology-config>
-     *    e.g., $ java Peer 127.0.0.1:6000 files/peer6001 linear.config
+     *    e.g., $ java Peer 127.0.0.1:6001 files/peer6001 linear.simple.config
      */
     public static void main(String[] args) {
         try {
@@ -163,7 +160,7 @@ public class Peer {
                             break;
                         case "search":
                             // if peer already contains file, save a communication call by ignoring request.
-                            if (new File(String.format("%s/%s", this.fileDir, fileName)).exists()) {
+                            if (new File(String.format("%s/%s", this.peerDir, fileName)).exists()) {
                                 this.log(String.format("'%s' is already here. Ignoring.", fileName));
                             } else {
                                 // increment sequence (post-increment)
@@ -184,15 +181,71 @@ public class Peer {
         return this;
     }
 
+    /** parseConfig - determines SuperPeer and Consistency Model from config */
+    private Peer parseConfig() {
+        try {
+            Scanner sc = new Scanner(new FileInputStream(this.config));
+            while (sc.hasNextLine()) {
+                // parse and decompose line
+                String[] line = sc.nextLine().split(" ");
+                String type = line[0];
+                switch (type) {
+                    case "c":
+                        switch (line[1]) {
+                            case "pull":
+                                this.model = ConsistencyModel.PULL;
+                                this.ttr = Integer.parseInt(line[2]);
+                                break;
+                            case "push":
+                                this.model = ConsistencyModel.PUSH;
+                                break;
+                            default:
+                                this.log(String.format("Unknown model '%s'. Defaulting to 'push'...", line[1]));
+                                this.model = ConsistencyModel.PUSH;
+                                break;
+                        }
+                        break;
+                    case "p":
+                        // only care about p lines
+                        IPv4 superPeer = new IPv4(line[1]);
+                        IPv4 peer = new IPv4(line[2]);
+
+                        if (this.equals(peer)) {
+                            // this is us!
+                            this.superPeer = superPeer;
+                            this.spSocket = new Socket(
+                                this.superPeer.getAddress(),
+                                this.superPeer.getPort()
+                            );
+                            this.fromSuperPeer = new DataInputStream(this.spSocket.getInputStream());
+                            this.toSuperPeer = new DataOutputStream(this.spSocket.getOutputStream());
+                            break;
+                        }
+                        break;
+                    case "s":
+                        // only applies to SuperPeer so we do nothing
+                        break;
+                    default:
+                        this.log(String.format("Unknown type '%s'. Ignoring...", type));
+                        break;
+                }
+            }
+            sc.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
     /** registerDirectory - goes through given directory and registers all the files within */
-    public Peer registerDirectory() {
+    private Peer registerDirectory() {
         try {
             // initial handshake
             this.toSuperPeer.writeUTF(this.toString());
 
-            // register files in directory to our in-memory registry
+            // register files in owned directory to SuperPeer
             int rc;
-            for (File file : this.fileDir.listFiles()) {
+            for (File file : this.ownedDir.listFiles()) {
                 if (file.isFile()) {
                     // register with SuperPeer, which acts as a PA1 Index
                     this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", file.getName(), this));
@@ -200,7 +253,7 @@ public class Peer {
                     if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return this;
@@ -227,7 +280,7 @@ public class Peer {
             // for writing to our own file directory
             DataOutputStream fileOut = new DataOutputStream(
                 new FileOutputStream(
-                    String.format("%s/%s", this.fileDir.getPath(), message.getFileName())
+                    String.format("%s/%s", this.downloadsDir.getPath(), message.getFileName())
                 )
             );
 
@@ -261,7 +314,7 @@ public class Peer {
             Message msg = new Message(message);
             DataInputStream in = new DataInputStream(
                 new FileInputStream(
-                    String.format("%s/%s", this.fileDir.getPath(), msg.getFileName())
+                    String.format("%s/%s", this.peerDir.getPath(), msg.getFileName())
                 )
             );
 
@@ -305,63 +358,6 @@ public class Peer {
     /** log - helper method for logging messages with a descriptive prefix. */
     public Peer log(String message) {
         System.out.println(String.format("[P %s]: %s", this, message));
-        return this;
-    }
-
-    /** parseConfig - determines SuperPeer and Consistency Model from config */
-    public Peer parseConfig() {
-        try {
-            // determine who my SuperPeer is by reading config file
-            Scanner sc = new Scanner(new FileInputStream(this.config));
-            while (sc.hasNextLine()) {
-                // parse and decompose line
-                String[] line = sc.nextLine().split(" ");
-                String type = line[0];
-                switch (type) {
-                    case "c":
-                        switch (line[1]) {
-                            case "pull":
-                                this.model = ConsistencyModel.PULL;
-                                break;
-                            case "push":
-                                this.model = ConsistencyModel.PUSH;
-                                break;
-                            default:
-                                this.log(String.format("Consistency model should be 'push' or 'pull', got '%s'. Defaulting to 'push'...", line[1]));
-                                this.model = ConsistencyModel.PUSH;
-                                break;
-                        }
-                        break;
-                    case "p":
-                        // only care about p lines
-                        IPv4 superPeer = new IPv4(line[1]);
-                        IPv4 peer = new IPv4(line[2]);
-
-                        if (this.equals(peer)) {
-                            // this is us!
-                            this.superPeer = superPeer;
-                            this.spSocket = new Socket(
-                                this.superPeer.getAddress(),
-                                this.superPeer.getPort()
-                            );
-                            this.fromSuperPeer = new DataInputStream(this.spSocket.getInputStream());
-                            this.toSuperPeer = new DataOutputStream(this.spSocket.getOutputStream());
-                            break;
-                        }
-                        break;
-                    case "s":
-                        // only applies to SuperPeer so we do nothing
-                        break;
-                    default:
-                        this.log(String.format("Unknown type '%s'. Ignoring...", type));
-                        this.model = ConsistencyModel.PUSH;
-                        break;
-                }
-            }
-            sc.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
         return this;
     }
 
@@ -409,7 +405,7 @@ public class Peer {
      *                      Deleted  -> deregistered from the SuperPeer.
      */
     public class PeerListener extends Thread {
-        /* reference to the Peer or SuperPeer this listener works for */
+        /* reference to the Peer this listener works for */
         private Peer peer;
 
         /* constructor(s) */
@@ -427,7 +423,7 @@ public class Peer {
                     ph.start();
                 }
             } catch (Exception e) {
-                this.peer.log("Closing PeerListener.");
+                this.peer.log("Closing PeerListener...");
             }
         }
     }
@@ -497,7 +493,7 @@ public class Peer {
             try {
                 this.peer = peer;
                 // get peer directory as a Path object.
-                Path dir = Paths.get(peer.fileDir.toString());
+                Path dir = Paths.get(peer.peerDir.toString());
                 // initialize a new watch service for this given directory.
                 this.observer = dir.getFileSystem().newWatchService();
                 // register the types of events we care about with this watch service.
@@ -544,4 +540,9 @@ public class Peer {
             }
         }
     }
+}
+
+enum ConsistencyModel {
+    PUSH,
+    PULL
 }
