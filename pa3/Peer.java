@@ -48,19 +48,21 @@ public class Peer {
     /* consistency-related */
     private ConsistencyModel model; // stores a 'push' or 'pull' consistency model
     private int ttr; // ('pull' model only) stores time-to-refresh
+    private ConcurrentHashMap<String, FileInfo> fileRegistry;
 
-    // superpeer-related
+    /* superpeer-related */
     private IPv4 superPeer; // address:port
     private Socket spSocket; // socket for communicating with SuperPeer
     private DataInputStream fromSuperPeer;
     private DataOutputStream toSuperPeer;
 
-    // nested class references
+    /* nested class references */
     private EventListener eventListener;
     private PeerListener peerListener;
 
     /* peer constructor */
     public Peer(String address, File fileDir, File config, int ttl) {
+
         try {
             this.address = new IPv4(address);
             this.peerDir = fileDir;
@@ -70,6 +72,7 @@ public class Peer {
             this.sequence = 0;
             this.ttl = ttl;
             this.messageLog = new ConcurrentHashMap<String, Boolean>();
+            this.fileRegistry = new ConcurrentHashMap<String, FileInfo>();
 
             this.parseConfig();
 
@@ -129,6 +132,7 @@ public class Peer {
     public Peer cli() {
         try {
             int rc;
+            FileInfo fi;
             String line = null;
             Scanner sc = new Scanner(System.in);
 
@@ -139,44 +143,37 @@ public class Peer {
 
                 // user input must have format: "command fileName"
                 String[] userInput = line.split("[ \t]+");
-                if (userInput.length == 2) {
-                    // parse user input
-                    String command = userInput[0];
-                    String fileName = userInput[1];
+                if (userInput.length != 2) { continue; }
 
-                    // check that 'command' is supported.
-                    switch (command) {
-                        case "register":
-                            // the "Message" for this command does not require an ID or TTL
-                            this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", fileName, this));
-                            rc = this.fromSuperPeer.readInt();
-                            if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
-                            break;
-                        case "deregister":
-                            // the "Message" for this command does not require an ID or TTL
-                            this.toSuperPeer.writeUTF(String.format("deregister 0;0;%s;%s", fileName, this));
-                            rc = this.fromSuperPeer.readInt();
-                            if (rc > 0) { this.log(String.format("Deregistration failed. Recieved error code %d", rc)); }
-                            break;
-                        case "search":
-                            // if peer already contains file, save a communication call by ignoring request.
-                            if (new File(String.format("%s/%s", this.peerDir, fileName)).exists()) {
-                                this.log(String.format("'%s' is already here. Ignoring.", fileName));
-                            } else {
-                                // increment sequence (post-increment)
-                                this.query(this.sequence++, this.ttl, fileName);
-                            }
-                            break;
-                        default:
-                            this.log(String.format("Unknown command '%s'. Ignoring.", command));
-                            break;
-                    }
+                // parse user input
+                String command = userInput[0];
+                String fileName = userInput[1];
+
+                // check that 'command' is supported.
+                switch (command) {
+                    case "register":
+                        this.register(new FileInfo(fileName, this.address));
+                        break;
+                    case "deregister":
+                        this.deregister(fileName);
+                        break;
+                    case "search":
+                        // if peer already contains file, save a communication call by ignoring request.
+                        if (new File(String.format("%s/%s", this.peerDir, fileName)).exists()) {
+                            this.log(String.format("'%s' is already here. Ignoring.", fileName));
+                        }
+                        this.query(fileName);
+                        break;
+                    default:
+                        this.log(String.format("Unknown command '%s'. Ignoring.", command));
+                        break;
                 }
             }
             sc.close();
-            this.log("Quitting...");
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            this.log("Quitting...");
         }
         return this;
     }
@@ -240,19 +237,90 @@ public class Peer {
     /** registerDirectory - goes through given directory and registers all the files within */
     private Peer registerDirectory() {
         try {
-            // initial handshake
-            this.toSuperPeer.writeUTF(this.toString());
+            this.handshake();
 
             // register files in owned directory to SuperPeer
-            int rc;
             for (File file : this.ownedDir.listFiles()) {
                 if (file.isFile()) {
-                    // register with SuperPeer, which acts as a PA1 Index
-                    this.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", file.getName(), this));
-                    rc = this.fromSuperPeer.readInt();
-                    if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
+                    this.register(new FileInfo(file.getName(), this.address));
                 }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** handshake - performs the required initial handshake with SuperPeer */
+    public Peer handshake() {
+        try {
+            // initial handshake
+            this.toSuperPeer.writeUTF(this.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** register - registers an owned file with SuperPeer */
+    public Peer register(FileInfo file) {
+        try {
+            Message msg = new Message(file, this.address);
+            // add to Peer registry
+            this.fileRegistry.putIfAbsent(file.getName(), file);
+            // send to SuperPeer
+            this.toSuperPeer.writeUTF(String.format("register %s", msg));
+            int rc = this.fromSuperPeer.readInt();
+            if (rc > 0) { this.log(String.format("Registration failed. Recieved error code %d", rc)); }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** deregister - deregisters a file from SuperPeer and does more depending on consistency model */
+    public Peer deregister(String fileName) {
+        try {
+            // only care about files we have
+            if (!this.fileRegistry.containsKey(fileName)) {
+                return this;
+            }
+
+            // remove from Peer registry
+            FileInfo fi = this.fileRegistry.remove(fileName);
+
+            // assemble new message and deregister from SuperPeer
+            Message msg = new Message(fi, this.address);
+            this.toSuperPeer.writeUTF(String.format("deregister %s", msg));
+            int rc = this.fromSuperPeer.readInt();
+            if (rc > 0) { this.log(String.format("Deregistration failed. Recieved error code %d", rc)); }
+            if (this.isOwner(fi) && this.model == ConsistencyModel.PUSH) {
+                // we are the owner and model is PUSH means we must broadcast!
+                // TODO: broadcast
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** query - creates a Message, sends to SuperPeer */
+    public Peer query(String fileName) {
+        try {
+            // only do work if we do not have this file
+            if (new File(this.ownedDir, fileName).exists() || new File(this.downloadsDir, fileName).exists()) {
+                this.log(String.format("'%s' is already here. Ignoring.", fileName));
+            }
+
+            // assemble a query Message
+            // note: 'owner' here means nothing since by definition we are 'querying' for this file
+            Message query = new Message(
+                this.generateMessageID(),
+                this.ttl,
+                new FileInfo(fileName, this.address),
+                this.address
+            );
+            this.toSuperPeer.writeUTF(String.format("query %s", query));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -330,19 +398,6 @@ public class Peer {
         return this;
     }
 
-    /** query - creates a Message, sends to SuperPeer */
-    public Peer query(int sequenceID, int ttl, String fileName) {
-        try {
-            String messageID = String.format("%s-%d", this, sequenceID);
-            Message query = new Message(messageID, ttl, fileName);
-            this.toSuperPeer.writeUTF(String.format("query %s", query));
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
-        return this;
-    }
-
     /** close - closes any sockets before Peer is terminated*/
     public Peer close() {
         try {
@@ -373,20 +428,23 @@ public class Peer {
     }
 
     /** toString - serializes the Peer */
-    public String toString() {
-        return this.address.toString();
+    public String toString() { return this.address.toString(); }
+
+    /** generateMessageID - creates Message ID using socket address and sequence number */
+    private String generateMessageID() {
+        return String.format("%s-%d", this, ++this.sequence);
     }
 
     /** equals - compares this Peer's PeerMetadata with another's */
-    public boolean equals(IPv4 other) {
-        return this.address.equals(other);
-    }
+    public boolean equals(IPv4 other) { return this.address.equals(other); }
 
     /** hasDownloaded - checks if this Peer has already downloaded file related to this message */
     public boolean hasDownloaded(String messageID) {
         return this.messageLog.getOrDefault(messageID, false);
     }
 
+    /** isOwner - checks if this peer is the owner (origin server) of file */
+    public boolean isOwner(FileInfo f) { return this.address.equals(f.getOwner()); }
 
 
     /**
@@ -493,7 +551,7 @@ public class Peer {
             try {
                 this.peer = peer;
                 // get peer directory as a Path object.
-                Path dir = Paths.get(peer.peerDir.toString());
+                Path dir = Paths.get(peer.ownedDir.toString());
                 // initialize a new watch service for this given directory.
                 this.observer = dir.getFileSystem().newWatchService();
                 // register the types of events we care about with this watch service.
@@ -510,6 +568,8 @@ public class Peer {
 
         public void run() {
             try {
+                IPv4 p;
+                FileInfo fi;
                 while (true) {
                     // accept/take a new event
                     WatchKey watchKey = observer.take();
@@ -518,17 +578,15 @@ public class Peer {
                     // iterate through the events
                     for (WatchEvent<?> event : events) {
                         if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            // a file was deleted so we deregister
-                            this.peer.toSuperPeer.writeUTF(String.format("deregister 0;0;%s;%s", event.context().toString(), this.peer));
-                            this.peer.fromSuperPeer.readInt();
+                            this.peer.deregister(event.context().toString());
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
-                            // a file was deleted so we deregister
-                            this.peer.toSuperPeer.writeUTF(String.format("register 0;0;%s;%s", event.context().toString(), this.peer));
-                            this.peer.fromSuperPeer.readInt();
+                            p = new IPv4(this.peer.toString());
+                            fi = new FileInfo(event.context().toString(), p);
+                            this.peer.register(fi);
                         } else {
                             // file was modified
                             if (this.peer.model == ConsistencyModel.PUSH) {
-                                // only broadcast invalidate message when the model is push.
+                                // broadcast invalidate message since model is PUSH
                                 // TODO
                             }
                         }

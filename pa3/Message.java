@@ -1,86 +1,53 @@
+/**
+ *  Message class - the primary serialization protocol for this P2P network.
+ */
 public class Message {
     private String messageID;
     private int ttl;
-    private String fileName;
-    private String address;
-    private int port;
+    private FileInfo file;
+    private IPv4 sender;
 
     /* constructor(s) */
     public Message(String message) {
         String[] msg = message.split(";");
         this.messageID = msg[0];
         this.ttl = Integer.parseInt(msg[1]);
-        this.fileName = msg[2];
-        if (msg.length > 3) {
-            this.address = msg[3].split(":")[0];
-            this.port = Integer.parseInt(msg[3].split(":")[1]);
-        }
+        this.file = new FileInfo(msg[2]);
+        this.sender = new IPv4(msg[3]);
+    }
+    public Message(FileInfo fileInfo, IPv4 sender) {
+        this.messageID = "0";
+        this.ttl = 0;
+        this.file = fileInfo;
+        this.sender = sender;
     }
 
-    public Message(String messageID, int ttl, String fileName) {
+    public Message(String messageID, int ttl, FileInfo fileInfo, IPv4 sender) {
         this.messageID = messageID;
         this.ttl = ttl;
-        this.fileName = fileName;
+        this.file = fileInfo;
+        this.sender = sender;
     }
-
-    public Message(String messageID, int ttl, String fileName, String fullAddress) {
+    public Message(String messageID, int ttl, FileInfo fileInfo, String senderAddress, int senderPort) {
         this.messageID = messageID;
         this.ttl = ttl;
-        this.fileName = fileName;
-        this.address = fullAddress.split(":")[0];
-        this.port = Integer.parseInt(fullAddress.split(":")[1]);
+        this.file = fileInfo;
+        this.sender = new IPv4(senderAddress, senderPort);
     }
 
-    public Message(String messageID, int ttl, String fileName, String address, int port) {
-        this.messageID = messageID;
-        this.ttl = ttl;
-        this.fileName = fileName;
-        this.address = address;
-        this.port = port;
-    }
-
-    /* getters and setters */
-    public String getID() {
-        return this.messageID;
-    }
-
-    public int getTTL() {
-        return this.ttl;
-    }
-
-    public String getFileName() {
-        return this.fileName;
-    }
-
-    public String getAddress() {
-        return this.address;
-    }
-
-    public int getPort() {
-        return this.port;
-    }
-
-    public String getFullAddress() {
-        return String.format("%s:%d", this.address, this.port);
-    }
-
-    public Message setFullAddress(String fullAddress) {
-        this.address = fullAddress.split(":")[0];
-        this.port = Integer.parseInt(fullAddress.split(":")[1]);
-        return this;
-    }
+    /* getters */
+    public String getID() { return this.messageID; }
+    public String getFileName() { return this.file.getName(); } // for convenience
+    public IPv4 getSender() { return this.sender; }
+    public FileInfo getFileInfo() { return this.file; }
+    public int getTTL() { return this.ttl; }
 
     public Message decrementTTL() {
         this.ttl -= 1;
         return this;
     }
 
-    /* helper methods */
     public String toString() {
-        if (this.address == null) {
-            return String.format("%s;%d;%s", this.messageID, this.ttl, this.fileName);
-        }
-        return String.format("%s;%d;%s;%s:%d",
-            this.messageID, this.ttl, this.fileName, this.address, this.port);
+        return String.format("%s;%d;%s;%s", this.messageID, this.ttl, this.file, this.sender);
     }
 }

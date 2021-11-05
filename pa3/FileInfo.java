@@ -7,6 +7,15 @@ public class FileInfo {
     public int version;
     public boolean valid;
 
+    /** constructor(s) */
+    public FileInfo(String fileInfo) {
+        // deserializes a FileInfo string (delimiter = ',' (comma))
+        String[] components = fileInfo.split(",");
+        this.name = components[0];
+        this.owner = new IPv4(components[1]);
+        this.version = Integer.parseInt(components[2]);
+        this.valid = Boolean.parseBoolean(components[3]);
+    }
     public FileInfo(String fileName, IPv4 owner) {
         this.name = fileName;
         this.owner = owner;
@@ -14,15 +23,13 @@ public class FileInfo {
         this.valid = true;
     }
 
-    public FileInfo(String fileInfo) {
-        // deserializes a FileInfo string
-    }
-
-    public boolean isValid() {
-        return this.valid;
-    }
+    /** getters and other helpful methods */
+    public String getName() { return this.name; }
+    public int getVersion() { return this.version; }
+    public IPv4 getOwner() { return this.owner; }
+    public boolean isValid() { return this.valid; }
 
     public String toString() {
-        return String.format("");
+        return String.format("%s,%s,%d,%s", this.name, this.owner, this.version, this.valid);
     }
 }
