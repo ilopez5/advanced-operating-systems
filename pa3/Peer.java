@@ -266,6 +266,7 @@ public class Peer {
     /** register - registers an owned file with SuperPeer */
     public Peer register(FileInfo file) {
         try {
+            // TODO: make sure file is not in the downloads folder
             Message msg = new Message(file, this.address);
             // add to Peer registry
             this.fileRegistry.putIfAbsent(file.getName(), file);
@@ -332,22 +333,17 @@ public class Peer {
 
     /** info - prints out peer information */
     public Peer info() {
-
         this.log(
-            String.format(
-                """
-                Printing Metadata...
-                            IPv4: %s
-                  Root Directory: %s
-                     Owned Files: /owned
-                Downloaded Files: /downloads
-                          Config: %s
-                             TTL: %d
-                             TTR: %d
-                Msg Sequence No.: %d
-                   File Registry: %s
-                """, this, this.peerDir, this.config, this.ttl, this.ttr, this.sequence, this.fileRegistry
-            )
+                "Printing Metadata..." +
+                "\n            IPv4: " + this +
+                "\n  Root Directory: " + this.peerDir +
+                "\n     Owned Files: /owned" +
+                "\nDownloaded Files: /downloads" +
+                "\n          Config: " + this.config +
+                "\n             TTL: " + this.ttl +
+                "\n             TTR: " + this.ttr +
+                "\nMsg Sequence No.: " + this.sequence +
+                "\n   File Registry: " + this.fileRegistry
         );
         return this;
     }
@@ -634,7 +630,7 @@ public class Peer {
                     sleep(30000);
 
                     for (FileInfo fi : this.peer.fileRegistry.values()) {
-                        if (fi.isValid() && !this.peer.isOwner(fi.getName()) && this.hasExpiredTTR(fi.getName())) {
+                        if (!this.peer.isOwner(fi.getName()) && this.hasExpiredTTR(fi.getName())) {
                             // we are not owner, file is considered valid, and ttr is expired => must verify
                             IPv4 origin = fi.getOwner();
                             Socket originSocket = new Socket(origin.getAddress().toString(), origin.getPort());
