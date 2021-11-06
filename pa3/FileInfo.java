@@ -2,10 +2,10 @@
  *  FileInfo - this class holds file-related metadata for consistency purposes.
  */
 public class FileInfo {
-    public String name;
-    public IPv4 owner;
-    public int version;
-    public boolean valid;
+    private String name;
+    private IPv4 owner;
+    private int version;
+    private boolean valid;
 
     /** constructor(s) */
     public FileInfo(String fileInfo) {
@@ -28,6 +28,7 @@ public class FileInfo {
     public int getVersion() { return this.version; }
     public IPv4 getOwner() { return this.owner; }
     public boolean isValid() { return this.valid; }
+    public FileInfo setValidity(boolean status) { this.valid = status; return this; }
 
     public String toString() {
         return String.format("%s,%s,%d,%s", this.name, this.owner, this.version, this.valid);

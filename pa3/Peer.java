@@ -60,10 +60,10 @@ public class Peer {
     /* nested class references */
     private EventListener eventListener;
     private PeerListener peerListener;
+    private ConsistencyChecker controller;
 
     /* peer constructor */
     public Peer(String address, File fileDir, File config, int ttl) {
-
         try {
             this.address = new IPv4(address);
             this.peerDir = fileDir;
@@ -75,6 +75,7 @@ public class Peer {
             this.messageLog = new ConcurrentHashMap<String, Boolean>();
             this.fileRegistry = new ConcurrentHashMap<String, FileInfo>();
 
+            if (!this.peerDir.exists()) { this.peerDir.mkdir(); }
             if (!this.ownedDir.exists()) { this.ownedDir.mkdir(); }
             if (!this.downloadsDir.exists()) { this.downloadsDir.mkdir(); }
 
@@ -84,23 +85,19 @@ public class Peer {
             this.server = new ServerSocket(this.address.getPort());
             this.server.setReuseAddress(true);
 
-            /**
-             *  PeerServer section:
-             *      spawns a PeerListener thread that listens for any incoming
-             *      peer connections. Upon recieving a connection, the PeerListener
-             *      spawns a PeerHandler thread to deal with it.
-             */
+            /** spawns a PeerListener thread that listens for any incoming peer connections */
             this.peerListener = new PeerListener(this);
             this.peerListener.start();
 
-            /**
-             *  EventListener section:
-             *      spawns an EventListener thread that watches for any changes
-             *      to the given directory. if new file, registers it. if a file
-             *      is deleted, deregisters it. if modified, update network
-             */
+            /** spawns an EventListener thread that watches for any filesystem changes */
             this.eventListener = new EventListener(this);
             this.eventListener.start();
+
+            if (this.model == ConsistencyModel.PULL) {
+                /** spawns a ConsistencyChecker to ensure coherence for files */
+                this.controller = new ConsistencyChecker(this);
+                this.controller.start();
+            }
 
             // look into file directory and store records of all my files
             this.registerDirectory();
@@ -153,8 +150,8 @@ public class Peer {
 
                 // check that 'command' is supported.
                 switch (command) {
-                    case "info":
-                        this.log("blah");
+                    case "print":
+                        this.info();
                         break;
                     case "register":
                         this.register(new FileInfo(fileName, this.address));
@@ -166,11 +163,7 @@ public class Peer {
                         this.query(fileName);
                         break;
                     case "refresh":
-                        if (this.model == ConsistencyModel.PUSH) {
-                            this.log("Cant refresh in a PUSH topology");
-                            continue;
-                        }
-                        // TODO
+                        this.refresh(fileName);
                         break;
                     default:
                         this.log(String.format("Unknown command '%s'. Ignoring.", command));
@@ -335,6 +328,36 @@ public class Peer {
             e.printStackTrace();
         }
         return this;
+    }
+
+    /** info - prints out peer information */
+    public Peer info() {
+        this.log(String.format(
+            """
+            Printing Metadata...
+                        IPv4: %s
+              Root Directory: %s
+                 Owned Files: /owned
+            Downloaded Files: /downloads
+                      Config: %s
+                         TTL: %d
+                         TTR: %d
+            Msg Sequence No.: %d
+               File Registry:
+                    %s
+            """, this, this.peerDir, this.config, this.ttl, this.ttr, this.sequence, this.fileRegistry
+        ));
+        return this;
+    }
+
+    /** refresh - file is no longer registered, need to redownload. alias of query */
+    public Peer refresh(String fileName) {
+        // we only care about PULL model for this command
+        if (this.model == ConsistencyModel.PUSH) {
+            this.log("Cant refresh in a PUSH topology");
+            return this;
+        }
+        return this.query(fileName);
     }
 
     /** download - given a message containing the Peer that has file, download it */
@@ -545,6 +568,7 @@ public class Peer {
                 String args = request[1];
 
                 // handle request
+                FileInfo received, master;
                 switch (command) {
                     case "queryhit":
                         // SuperPeer just forwarded a queryhit message to you
@@ -562,6 +586,18 @@ public class Peer {
                         //  syntax: 'obtain fileName'
                         this.peer.upload(args, this.toPeer);
                         break;
+                    case "status":
+                        received = new FileInfo(args);
+                        if (!this.peer.fileRegistry.containsKey(received.getName())) {
+                            toPeer.writeUTF("deleted");
+                        }
+                        master = this.peer.fileRegistry.get(received.getName());
+                        if (received.getVersion() != master.getVersion()) {
+                            toPeer.writeUTF("outdated");
+                        } else {
+                            toPeer.writeUTF("uptodate");
+                        }
+                        break;
                     default:
                         this.peer.log(String.format("Received unknown command '%s'. Ignoring.", command));
                         break;
@@ -569,6 +605,90 @@ public class Peer {
                 this.peerSocket.close();
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    private class ConsistencyChecker extends Thread {
+        /* reference to this peer */
+        private Peer peer;
+        private HashMap<String, Instant> history;
+
+        public ConsistencyChecker(Peer peer) {
+            this.peer = peer;
+            this.history = new HashMap<String, Instant>();
+        }
+
+        public void run() {
+            try {
+                while (true) {
+                    // periodically check every 30 seconds
+                    sleep(30000);
+
+                    for (FileInfo fi : this.peer.fileRegistry.values()) {
+                        if (fi.isValid() && !this.peer.isOwner(fi.getName()) && this.hasExpiredTTR(fi.getName())) {
+                            // we are not owner, file is considered valid, and ttr is expired => must verify
+                            IPv4 origin = fi.getOwner();
+                            Socket originSocket = new Socket(origin.getAddress().toString(), origin.getPort());
+                            DataInputStream originIn = new DataInputStream(originSocket.getInputStream());
+                            DataOutputStream originOut = new DataOutputStream(originSocket.getOutputStream());
+
+                            // handshake
+                            originOut.writeUTF(this.toString());
+
+                            // request status of this fileinfo
+                            originOut.writeUTF(String.format("status %s", fi));
+
+                            String response = originIn.readUTF();
+                            switch (response) {
+                                case "deleted":
+                                    // origin server deleted the file, so we do too
+                                    this.peer.log("Origin server has deleted this file. Deregistering.");
+                                    this.peer.deregister(fi.getName());
+                                    this.history.remove(fi.getName());
+                                    break;
+                                case "outdated":
+                                    // set to invalid but do not delete file
+                                    this.peer.log(String.format("'%s' is out of date. Deregistering. ('refresh %s' to redownload)", fi.getName(), fi.getName()));
+                                    this.peer.deregister(fi.getName());
+                                    this.history.remove(fi.getName());
+                                    break;
+                                case "uptodate":
+                                    // all good, just update the time we have seen this
+                                    this.history.put(fi.getName(), Instant.now());
+                                    break;
+                                default:
+                                    this.peer.log(String.format("Unknown response '%s'. Ignoring.", response));
+                            }
+                            originSocket.close();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                this.peer.log("Closing ConsistencyChecker...");
+            }
+        }
+
+        /** hasExpiredTTR - determines whether a file has an expired TTR or not */
+        public boolean hasExpiredTTR(String fileName) {
+            Instant lastChecked = this.getLastChecked(fileName);
+            // null means first time, so we check anyways
+            if (lastChecked != null) {
+                Duration duration = Duration.between(lastChecked, Instant.now());
+                if (duration.toMinutes() < this.peer.ttr) {
+                    // been longer than ttr, time to refresh
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** getLastChecked - determines last time a file was checked */
+        public Instant getLastChecked(String fileName) {
+            if (this.history.containsKey(fileName)) {
+                return this.history.get(fileName);
+            } else {
+                return null;
             }
         }
     }
@@ -583,7 +703,7 @@ public class Peer {
             try {
                 this.peer = peer;
                 // get peer directory as a Path object.
-                Path dir = Paths.get(peer.ownedDir.toString());
+                Path dir = Paths.get(peer.peerDir.toString());
                 // initialize a new watch service for this given directory.
                 this.observer = dir.getFileSystem().newWatchService();
                 // register the types of events we care about with this watch service.
