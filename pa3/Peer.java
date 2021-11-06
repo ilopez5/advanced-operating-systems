@@ -332,21 +332,23 @@ public class Peer {
 
     /** info - prints out peer information */
     public Peer info() {
-        this.log(String.format(
-            """
-            Printing Metadata...
-                        IPv4: %s
-              Root Directory: %s
-                 Owned Files: /owned
-            Downloaded Files: /downloads
-                      Config: %s
-                         TTL: %d
-                         TTR: %d
-            Msg Sequence No.: %d
-               File Registry:
-                    %s
-            """, this, this.peerDir, this.config, this.ttl, this.ttr, this.sequence, this.fileRegistry
-        ));
+
+        this.log(
+            String.format(
+                """
+                Printing Metadata...
+                            IPv4: %s
+                  Root Directory: %s
+                     Owned Files: /owned
+                Downloaded Files: /downloads
+                          Config: %s
+                             TTL: %d
+                             TTR: %d
+                Msg Sequence No.: %d
+                   File Registry: %s
+                """, this, this.peerDir, this.config, this.ttl, this.ttr, this.sequence, this.fileRegistry
+            )
+        );
         return this;
     }
 
@@ -447,6 +449,7 @@ public class Peer {
             this.spSocket.close();
             this.server.close();
             this.eventListener.observer.close();
+            this.controller.interrupt();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -558,8 +561,8 @@ public class Peer {
         public void run() {
             try {
                 // receive handshake
-                String peer = fromPeer.readUTF();
-                this.peer.log(String.format("Connected with (%s)", peer));
+                String caller = fromPeer.readUTF();
+                this.peer.log(String.format("Connected with (%s)", caller));
 
 
                 // receive peer request and parse
@@ -587,14 +590,19 @@ public class Peer {
                         this.peer.upload(args, this.toPeer);
                         break;
                     case "status":
+                        this.peer.log("debug -> received " + command + " " + args);
                         received = new FileInfo(args);
                         if (!this.peer.fileRegistry.containsKey(received.getName())) {
+                            this.peer.log("debug -> this file has been deregistered");
                             toPeer.writeUTF("deleted");
+                            break;
                         }
                         master = this.peer.fileRegistry.get(received.getName());
                         if (received.getVersion() != master.getVersion()) {
+                            this.peer.log("debug -> this file is out of date");
                             toPeer.writeUTF("outdated");
                         } else {
+                            this.peer.log("debug -> this file is up to date");
                             toPeer.writeUTF("uptodate");
                         }
                         break;
@@ -640,6 +648,7 @@ public class Peer {
                             originOut.writeUTF(String.format("status %s", fi));
 
                             String response = originIn.readUTF();
+                            this.peer.log("debug -> got back " + response);
                             switch (response) {
                                 case "deleted":
                                     // origin server deleted the file, so we do too
@@ -747,7 +756,7 @@ public class Peer {
                     watchKey.reset();
                 }
             } catch (Exception e) {
-                this.peer.log("Closing Watchdog.");
+                this.peer.log("Closing Watchdog...");
             }
         }
     }
