@@ -25,6 +25,7 @@ import java.io.*;
  *              [2] https://www.geeksforgeeks.org/multithreaded-servers-in-java/
  *              [3] https://stackoverflow.com/questions/3154488/how-do-i-iterate-through-the-files-in-a-directory-in-java
  *              [4] https://www.rgagnon.com/javadetails/java-detect-file-modification-event.html
+ *              [5] https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
  */
 public class Peer {
     /* identification */
@@ -73,6 +74,9 @@ public class Peer {
             this.ttl = ttl;
             this.messageLog = new ConcurrentHashMap<String, Boolean>();
             this.fileRegistry = new ConcurrentHashMap<String, FileInfo>();
+
+            if (!this.ownedDir.exists()) { this.ownedDir.mkdir(); }
+            if (!this.downloadsDir.exists()) { this.downloadsDir.mkdir(); }
 
             this.parseConfig();
 
@@ -131,8 +135,6 @@ public class Peer {
     /** cli - provides the command line interface for interactive user input */
     public Peer cli() {
         try {
-            int rc;
-            FileInfo fi;
             String line = null;
             Scanner sc = new Scanner(System.in);
 
@@ -151,6 +153,9 @@ public class Peer {
 
                 // check that 'command' is supported.
                 switch (command) {
+                    case "info":
+                        this.log("blah");
+                        break;
                     case "register":
                         this.register(new FileInfo(fileName, this.address));
                         break;
@@ -158,11 +163,14 @@ public class Peer {
                         this.deregister(fileName);
                         break;
                     case "search":
-                        // if peer already contains file, save a communication call by ignoring request.
-                        if (new File(String.format("%s/%s", this.peerDir, fileName)).exists()) {
-                            this.log(String.format("'%s' is already here. Ignoring.", fileName));
-                        }
                         this.query(fileName);
+                        break;
+                    case "refresh":
+                        if (this.model == ConsistencyModel.PUSH) {
+                            this.log("Cant refresh in a PUSH topology");
+                            continue;
+                        }
+                        // TODO
                         break;
                     default:
                         this.log(String.format("Unknown command '%s'. Ignoring.", command));
@@ -294,9 +302,10 @@ public class Peer {
             this.toSuperPeer.writeUTF(String.format("deregister %s", msg));
             int rc = this.fromSuperPeer.readInt();
             if (rc > 0) { this.log(String.format("Deregistration failed. Recieved error code %d", rc)); }
-            if (this.isOwner(fi) && this.model == ConsistencyModel.PUSH) {
+            if (this.equals(fi.getOwner()) && this.model == ConsistencyModel.PUSH) {
                 // we are the owner and model is PUSH means we must broadcast!
                 // TODO: broadcast
+                this.log("TODO: broadcast an invalidate message!");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -310,6 +319,7 @@ public class Peer {
             // only do work if we do not have this file
             if (new File(this.ownedDir, fileName).exists() || new File(this.downloadsDir, fileName).exists()) {
                 this.log(String.format("'%s' is already here. Ignoring.", fileName));
+                return this;
             }
 
             // assemble a query Message
@@ -330,11 +340,8 @@ public class Peer {
     /** download - given a message containing the Peer that has file, download it */
     public Peer download(Message message, IPv4 target) {
         try {
-            Instant start, end;
-            Duration duration;
-
             // open sockets to leaf peer
-            Socket targetSocket = new Socket(target.getAddress(), target.getPort());
+            Socket targetSocket = new Socket(target.getAddress().toString(), target.getPort());
             DataInputStream targetIn = new DataInputStream(targetSocket.getInputStream());
             DataOutputStream targetOut = new DataOutputStream(targetSocket.getOutputStream());
 
@@ -342,56 +349,69 @@ public class Peer {
             targetOut.writeUTF(this.toString());
 
             // send the request to target for the given file
-            start = Instant.now();
             targetOut.writeUTF(String.format("obtain %s", message));
 
             // for writing to our own file directory
             DataOutputStream fileOut = new DataOutputStream(
-                new FileOutputStream(
-                    String.format("%s/%s", this.downloadsDir.getPath(), message.getFileName())
-                )
+                new FileOutputStream(new File(this.downloadsDir, message.getFileName()))
             );
 
-            // code for sending/receiving bytes over socket from adapted from: https://stackoverflow.com/questions/9520911/java-sending-and-receiving-file-byte-over-sockets
+            if (this.model == ConsistencyModel.PULL) {
+                // need get origin server and other related info (e.g., ttr)
+                FileInfo fi = new FileInfo(targetIn.readUTF());
+                this.fileRegistry.put(fi.getName(), fi);
+            }
+
             this.log(String.format("Downloading '%s' from (%s)...", message.getFileName(), target));
+
+            Instant start = Instant.now();
             int count;
             byte[] buffer = new byte[8192];
             while ((count = targetIn.read(buffer)) > 0) {
                 fileOut.write(buffer, 0, count-1);
             }
+            Duration duration = Duration.between(start, Instant.now());
 
-            end = Instant.now();
-            duration = Duration.between(start, end);
             this.log(String.format("Download complete. (took %s)", this.elapsed(duration)));
+            // mark this message id as having been successfully downloaded
             this.messageLog.put(message.getID(), true);
 
             // close sockets
             fileOut.close();
             targetSocket.close();
+        } catch (IOException e) {
+            this.log("Exception occured.");
+            this.messageLog.put(message.getID(), false);
+            e.printStackTrace();
         } catch (Exception e) {
-            this.log("Caught an exception, ruh roh");
-            this.messageLog.put(message.toString(), false);
             e.printStackTrace();
         }
         return this;
     }
 
     /** upload - given a message and an output stream, writes to it */
-    public Peer upload(String message, DataOutputStream out) {
+    public Peer upload(String message, DataOutputStream toPeer) {
         try {
+            this.log("Uploading file.");
             Message msg = new Message(message);
-            DataInputStream in = new DataInputStream(
-                new FileInputStream(
-                    String.format("%s/%s", this.peerDir.getPath(), msg.getFileName())
-                )
+
+            DataInputStream dataIn = new DataInputStream(
+                new FileInputStream(this.findFile(msg.getFileName()))
             );
 
+            if (this.model == ConsistencyModel.PULL) {
+                // need to send file info
+                FileInfo fi = this.fileRegistry.get(msg.getFileName());
+                toPeer.writeUTF(fi.toString());
+            }
+
+            // download file in chunks
             int count;
             byte[] buffer = new byte[8192]; // or 4096, or more
-            while ((count = in.read(buffer)) > 0) {
-                out.write(buffer, 0, count);
+            while ((count = dataIn.read(buffer)) > 0) {
+                toPeer.write(buffer, 0, count);
             }
-            in.close();
+            dataIn.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -431,20 +451,25 @@ public class Peer {
     public String toString() { return this.address.toString(); }
 
     /** generateMessageID - creates Message ID using socket address and sequence number */
-    private String generateMessageID() {
-        return String.format("%s-%d", this, ++this.sequence);
+    private String generateMessageID() { return String.format("%s-%d", this, ++this.sequence); }
+
+    /** findFile - searchs for file in owned/ and downloads/ directories */
+    public File findFile(String fileName) {
+        File owned = new File(this.ownedDir, fileName);
+        if (owned.isFile()) { return owned; }
+        return new File(this.downloadsDir, fileName);
     }
 
-    /** equals - compares this Peer's PeerMetadata with another's */
+    /** equals - compares this Peer's IPv4 with another's */
     public boolean equals(IPv4 other) { return this.address.equals(other); }
 
     /** hasDownloaded - checks if this Peer has already downloaded file related to this message */
-    public boolean hasDownloaded(String messageID) {
-        return this.messageLog.getOrDefault(messageID, false);
-    }
+    public boolean hasDownloaded(String messageID) { return this.messageLog.getOrDefault(messageID, false); }
 
     /** isOwner - checks if this peer is the owner (origin server) of file */
-    public boolean isOwner(FileInfo f) { return this.address.equals(f.getOwner()); }
+    public boolean isOwner(String fileName) {
+        return this.equals(this.fileRegistry.get(fileName).getOwner());
+    }
 
 
     /**
@@ -487,24 +512,32 @@ public class Peer {
     }
 
     private class PeerHandler extends Thread {
-        /* reference to peer, and to the socket of the connecting peer */
+        /* reference to this peer */
         private Peer peer;
+        /* socket of the connecting peer */
         private Socket peerSocket;
+        DataInputStream fromPeer;
+        DataOutputStream toPeer;
 
         /* constructor */
         public PeerHandler(Peer peer, Socket socket) {
-            this.peer = peer;
-            this.peerSocket = socket;
+            try {
+                this.peer = peer;
+                this.peerSocket = socket;
+                // open input/output streams for communication
+                this.fromPeer = new DataInputStream(this.peerSocket.getInputStream());
+                this.toPeer = new DataOutputStream(this.peerSocket.getOutputStream());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         public void run() {
             try {
-                // open input/output streams for communication
-                DataInputStream fromPeer = new DataInputStream(this.peerSocket.getInputStream());
-                DataOutputStream toPeer = new DataOutputStream(this.peerSocket.getOutputStream());
-
-                // handshake
+                // receive handshake
                 String peer = fromPeer.readUTF();
+                this.peer.log(String.format("Connected with (%s)", peer));
+
 
                 // receive peer request and parse
                 String[] request = fromPeer.readUTF().split("[ \t]+");
@@ -514,10 +547,9 @@ public class Peer {
                 // handle request
                 switch (command) {
                     case "queryhit":
-                        // SuperPeer just forwarded a query hit message to you
-                        //      syntax: 'queryhit <msgid;ttl;fileName;ip:port> <ip:port>'
+                        // SuperPeer just forwarded a queryhit message to you
                         Message msg = new Message(args);
-                        this.peer.log(String.format("received 'queryhit %s %s' from %s", args, request[2], peer));
+                        this.peer.log(String.format("received 'queryhit %s %s'", args, request[2]));
                         this.peer.downloadLock.lock();
                         if (!this.peer.hasDownloaded(msg.getID())) {
                             // we have not downloaded the file yet
@@ -528,7 +560,7 @@ public class Peer {
                     case "obtain":
                         // another peer wants this file
                         //  syntax: 'obtain fileName'
-                        this.peer.upload(args, toPeer);
+                        this.peer.upload(args, this.toPeer);
                         break;
                     default:
                         this.peer.log(String.format("Received unknown command '%s'. Ignoring.", command));
@@ -585,9 +617,10 @@ public class Peer {
                             this.peer.register(fi);
                         } else {
                             // file was modified
-                            if (this.peer.model == ConsistencyModel.PUSH) {
-                                // broadcast invalidate message since model is PUSH
-                                // TODO
+                            if (this.peer.isOwner(event.context().toString())) {
+                                if (this.peer.model == ConsistencyModel.PUSH) {
+                                    // TODO: broadcast invalidate message since model is PUSH
+                                }
                             }
                         }
                     }

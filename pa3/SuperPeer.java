@@ -28,14 +28,6 @@ public class SuperPeer {
     private int historySize = 50;
     private ConsistencyModel model;
 
-    // colors
-    public static final String ANSI_RESET = "\u001B[0m";
-    public static final String ANSI_RED = "\u001B[31m";
-    public static final String ANSI_GREEN = "\u001B[32m";
-    public static final String ANSI_YELLOW = "\u001B[33m";
-    public static final String ANSI_CYAN = "\u001B[36m";
-    public static final String ANSI_WHITE = "\u001B[37m";
-
     /* constructor */
     public SuperPeer(String address, File config) {
         try {
@@ -75,7 +67,7 @@ public class SuperPeer {
      */
     public SuperPeer initialize() {
         try {
-            this.log(String.format("Listening on %s:%d...", this.getAddress(), this.getPort()));
+            this.log(String.format("Listening on %s...", this));
             // read config file (e.g., all-to-all.config, linear.config)
             Scanner sc = new Scanner(new FileInputStream(this.config));
 
@@ -142,8 +134,7 @@ public class SuperPeer {
                 filePeerList.add(peer);
                 this.registry.put(fileName, filePeerList);
             }
-            this.log(String.format("%sRegistered%s '%s' to (Leaf %s).",
-                            ANSI_GREEN, ANSI_RESET, fileName, peer));
+            this.log(String.format("Registered '%s' to (Leaf %s).", fileName, peer));
             return 0;
         } catch (Exception e) {
             e.printStackTrace();
@@ -158,8 +149,7 @@ public class SuperPeer {
             if (this.registry.containsKey(fileName)) {
                 HashSet<IPv4> filePeerList = this.registry.get(fileName);
                 filePeerList.remove(peer);
-                this.log(String.format("%sDeregistered%s (Leaf %s) from '%s'.",
-                            ANSI_RED, ANSI_RESET, peer, fileName));
+                this.log(String.format("Deregistered (Leaf %s) from '%s'.", peer, fileName));
                 if (filePeerList.size() == 0) {
                     // last peer removed from file's peer list, remove file from registry
                     this.registry.remove(fileName);
@@ -193,14 +183,13 @@ public class SuperPeer {
 
     /** log - helper method for logging messages with a descriptive prefix */
     public SuperPeer log(String message) {
-        System.out.println(String.format("[%sSP %s%s]: %s",
-                            ANSI_WHITE, this.address, ANSI_RESET, message));
+        System.out.println(String.format("[SP %s]: %s", this.address, message));
         return this;
     }
 
     /** getAddress - returns IPv4 address of this SuperPeer */
-    public String getAddress() {
-        return this.address.getAddress();
+    public IPv4 getAddress() {
+        return this.address;
     }
 
     /** getPort - returns server port of this SuperPeer */
@@ -403,17 +392,14 @@ public class SuperPeer {
                     String command = request[0];
                     Message message = new Message(request[1]);
 
-                    int rc;
                     switch (command) {
                         case "register":
-                            // received a register command from a leaf node
-                            rc = this.superPeer.register(message.getFileName(), this.peer);
-                            toPeer.writeInt(rc);
+                            // received a register command from a leaf node, return status code
+                            toPeer.writeInt(this.superPeer.register(message.getFileName(), this.peer));
                             break;
                         case "deregister":
-                            // receive a deregister command from a leaf node
-                            rc = this.superPeer.deregister(message.getFileName(), this.peer);
-                            toPeer.writeInt(rc);
+                            // receive a deregister command from a leaf node, return status code
+                            toPeer.writeInt(this.superPeer.deregister(message.getFileName(), this.peer));
                             break;
                         case "query":
                             // check if this query is directly from our leaf and if we have the file
@@ -425,7 +411,8 @@ public class SuperPeer {
                                     DataOutputStream toRequester = new DataOutputStream(reqSock.getOutputStream());
                                     for (IPv4 l : leafs) {
                                         // send queryhit back to leaf requester, one for each leaf
-                                        this.superPeer.log(String.format("(%s) has this file.", l));
+                                        this.superPeer.log(String.format("(%s) has '%s'.", l, message.getFileName()));
+                                        toRequester.writeUTF(this.toString());
                                         toRequester.writeUTF(String.format("queryhit %s %s", message, l));
                                     }
                                     reqSock.close();
@@ -442,7 +429,8 @@ public class SuperPeer {
                                 message.decrementTTL();
                                 for (String n : this.superPeer.neighbors) {
                                     try {
-                                        this.superPeer.log(String.format("Forwarding 'query %s %s' to (%s)", message, this.superPeer, n));
+                                        message.setSender(this.superPeer.getAddress());
+                                        this.superPeer.log(String.format("Forwarding 'query %s' to (%s)", message, n));
                                         IPv4 neighbor = new IPv4(n);
                                         // forward the message to each, with the TTL decremented
                                         Socket nSock = new Socket(neighbor.getAddress(), neighbor.getPort());
@@ -454,7 +442,7 @@ public class SuperPeer {
                                         );
                                         nSock.close();
                                     } catch (Exception e) {
-                                        this.superPeer.log(String.format("Failed to forward message to (%s)", n));
+                                        this.superPeer.log(String.format("Could not connect to (%s). Is it live?", n));
                                         continue;
                                     }
                                 }

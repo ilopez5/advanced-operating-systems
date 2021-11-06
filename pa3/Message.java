@@ -41,6 +41,7 @@ public class Message {
     public IPv4 getSender() { return this.sender; }
     public FileInfo getFileInfo() { return this.file; }
     public int getTTL() { return this.ttl; }
+    public Message setSender(IPv4 newSender) { this.sender = newSender; return this; }
 
     public Message decrementTTL() {
         this.ttl -= 1;
