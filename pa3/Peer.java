@@ -266,7 +266,6 @@ public class Peer {
     /** register - registers an owned file with SuperPeer */
     public Peer register(FileInfo file) {
         try {
-            // TODO: make sure file is not in the downloads folder
             Message msg = new Message(file, this.address);
             // add to Peer registry
             this.fileRegistry.putIfAbsent(file.getName(), file);
@@ -325,6 +324,22 @@ public class Peer {
                 this.address
             );
             this.toSuperPeer.writeUTF(String.format("query %s", query));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return this;
+    }
+
+    /** invalidate - broadcasts an invalidate message when an owned file is modified/deleted */
+    public Peer invalidate(String fileName) {
+        try {
+            Message invalidate = new Message(
+                this.generateMessageID(),
+                this.ttl,
+                new FileInfo(fileName, this.address),
+                this.address
+            );
+            this.toSuperPeer.writeUTF(String.format("invalidate %s", invalidate));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -577,6 +592,7 @@ public class Peer {
                         if (!this.peer.hasDownloaded(msg.getID())) {
                             // we have not downloaded the file yet
                             this.peer.download(msg, new IPv4(request[2]));
+                            this.peer.register(new FileInfo(msg.getFileName(), new IPv4(request[2])));
                         }
                         this.peer.downloadLock.unlock();
                         break;
@@ -725,8 +741,8 @@ public class Peer {
 
         public void run() {
             try {
-                IPv4 p;
                 FileInfo fi;
+                String fileName;
                 while (true) {
                     // accept/take a new event
                     WatchKey watchKey = observer.take();
@@ -734,18 +750,31 @@ public class Peer {
 
                     // iterate through the events
                     for (WatchEvent<?> event : events) {
+                        // grab file name
+                        fileName = event.context().toString();
+
                         if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            this.peer.deregister(event.context().toString());
+                            // file has been deleted, so we deregister
+                            this.peer.deregister(fileName);
+                            if (this.peer.model == ConsistencyModel.PUSH) {
+                                this.peer.invalidate(fileName);
+                            }
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
-                            p = new IPv4(this.peer.toString());
-                            fi = new FileInfo(event.context().toString(), p);
+                            // file has been created, this peer is the owner
+                            fi = new FileInfo(
+                                fileName,
+                                new IPv4(this.peer.toString())
+                            );
                             this.peer.register(fi);
                         } else {
-                            // file was modified
-                            if (this.peer.isOwner(event.context().toString())) {
-                                if (this.peer.model == ConsistencyModel.PUSH) {
-                                    // TODO: broadcast invalidate message since model is PUSH
-                                }
+                            // file was modified, increment version
+                            fi = this.peer.fileRegistry.get(fileName);
+                            fi.incrementVersion();
+                            this.peer.fileRegistry.put(fileName, fi);
+
+                            if (this.peer.model == ConsistencyModel.PUSH) {
+                                // need to invalidate globally
+                                this.peer.invalidate(fileName);
                             }
                         }
                     }

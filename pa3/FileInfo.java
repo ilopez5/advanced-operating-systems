@@ -24,6 +24,7 @@ public class FileInfo {
     public String getName() { return this.name; }
     public int getVersion() { return this.version; }
     public IPv4 getOwner() { return this.owner; }
+    public FileInfo incrementVersion() { this.version++; return this; }
 
     public String toString() {
         return String.format("%s,%s,%d", this.name, this.owner, this.version);
