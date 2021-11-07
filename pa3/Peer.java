@@ -296,9 +296,8 @@ public class Peer {
             int rc = this.fromSuperPeer.readInt();
             if (rc > 0) { this.log(String.format("Deregistration failed. Recieved error code %d", rc)); }
             if (this.equals(fi.getOwner()) && this.model == ConsistencyModel.PUSH) {
-                // we are the owner and model is PUSH means we must broadcast!
-                // TODO: broadcast
-                this.log("TODO: broadcast an invalidate message!");
+                // we are the owner and model is PUSH means we must broadcast an invalidate
+                this.invalidate(fileName);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -310,7 +309,7 @@ public class Peer {
     public Peer query(String fileName) {
         try {
             // only do work if we do not have this file
-            if (new File(this.ownedDir, fileName).exists() || new File(this.downloadsDir, fileName).exists()) {
+            if (new File(this.ownedDir, fileName).exists()) {
                 this.log(String.format("'%s' is already here. Ignoring.", fileName));
                 return this;
             }
@@ -392,11 +391,11 @@ public class Peer {
                 new FileOutputStream(new File(this.downloadsDir, message.getFileName()))
             );
 
-            if (this.model == ConsistencyModel.PULL) {
+            // if (this.model == ConsistencyModel.PULL) {
                 // need get origin server and other related info (e.g., ttr)
                 FileInfo fi = new FileInfo(targetIn.readUTF());
                 this.fileRegistry.put(fi.getName(), fi);
-            }
+            // }
 
             this.log(String.format("Downloading '%s' from (%s)...", message.getFileName(), target));
 
@@ -426,20 +425,18 @@ public class Peer {
     }
 
     /** upload - given a message and an output stream, writes to it */
-    public Peer upload(String message, DataOutputStream toPeer) {
+    public Peer upload(Message msg, DataOutputStream toPeer) {
         try {
-            this.log("Uploading file.");
-            Message msg = new Message(message);
-
+            this.log(String.format("Uploading '%s'", msg.getFileName()));
             DataInputStream dataIn = new DataInputStream(
                 new FileInputStream(this.findFile(msg.getFileName()))
             );
 
-            if (this.model == ConsistencyModel.PULL) {
+            // if (this.model == ConsistencyModel.PULL) {
                 // need to send file info
                 FileInfo fi = this.fileRegistry.get(msg.getFileName());
                 toPeer.writeUTF(fi.toString());
-            }
+            // }
 
             // download file in chunks
             int count;
@@ -460,7 +457,9 @@ public class Peer {
             this.spSocket.close();
             this.server.close();
             this.eventListener.observer.close();
-            this.controller.interrupt();
+            if (this.model == ConsistencyModel.PULL) {
+                this.controller.interrupt();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -583,11 +582,21 @@ public class Peer {
 
                 // handle request
                 FileInfo received, master;
+                Message msg;
                 switch (command) {
+                    case "invalidate":
+                        // our SuperPeer is telling us to invalidate this file
+                        this.peer.log(String.format("received '%s %s'", command, args));
+                        msg = new Message(args);
+                        this.peer.fileRegistry.remove(msg.getFileName());
+                        new File(this.peer.downloadsDir, msg.getFileName()).delete();
+                        break;
                     case "queryhit":
                         // SuperPeer just forwarded a queryhit message to you
-                        Message msg = new Message(args);
-                        this.peer.log(String.format("received 'queryhit %s %s'", args, request[2]));
+                        this.peer.log(String.format("received '%s %s %s'", command, args, request[2]));
+                        msg = new Message(args);
+
+                        // while being thread-safe, attempt to download file
                         this.peer.downloadLock.lock();
                         if (!this.peer.hasDownloaded(msg.getID())) {
                             // we have not downloaded the file yet
@@ -598,23 +607,20 @@ public class Peer {
                         break;
                     case "obtain":
                         // another peer wants this file
-                        //  syntax: 'obtain fileName'
-                        this.peer.upload(args, this.toPeer);
+                        this.peer.log(String.format("received '%s %s'", command, args));
+                        msg = new Message(args);
+                        this.peer.upload(msg, this.toPeer);
                         break;
                     case "status":
-                        this.peer.log("debug -> received " + command + " " + args);
                         received = new FileInfo(args);
                         if (!this.peer.fileRegistry.containsKey(received.getName())) {
-                            this.peer.log("debug -> this file has been deregistered");
                             toPeer.writeUTF("deleted");
                             break;
                         }
                         master = this.peer.fileRegistry.get(received.getName());
                         if (received.getVersion() != master.getVersion()) {
-                            this.peer.log("debug -> this file is out of date");
                             toPeer.writeUTF("outdated");
                         } else {
-                            this.peer.log("debug -> this file is up to date");
                             toPeer.writeUTF("uptodate");
                         }
                         break;
@@ -660,13 +666,14 @@ public class Peer {
                             originOut.writeUTF(String.format("status %s", fi));
 
                             String response = originIn.readUTF();
-                            this.peer.log("debug -> got back " + response);
+                            this.peer.log(String.format("{VC} -> status of '%s': %s", fi.getName(), response));
                             switch (response) {
                                 case "deleted":
                                     // origin server deleted the file, so we do too
                                     this.peer.log("Origin server has deleted this file. Deregistering.");
                                     this.peer.deregister(fi.getName());
                                     this.history.remove(fi.getName());
+                                    new File(this.peer.downloadsDir, fi.getName()).delete();
                                     break;
                                 case "outdated":
                                     // set to invalid but do not delete file
@@ -724,7 +731,7 @@ public class Peer {
             try {
                 this.peer = peer;
                 // get peer directory as a Path object.
-                Path dir = Paths.get(peer.peerDir.toString());
+                Path dir = Paths.get(peer.ownedDir.toString());
                 // initialize a new watch service for this given directory.
                 this.observer = dir.getFileSystem().newWatchService();
                 // register the types of events we care about with this watch service.

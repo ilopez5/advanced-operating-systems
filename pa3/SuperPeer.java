@@ -26,7 +26,6 @@ public class SuperPeer {
     private Set<String> leafs; // for tracking associated peers
     private File config;
     private int historySize = 50;
-    private ConsistencyModel model;
 
     /* constructor */
     public SuperPeer(String address, File config) {
@@ -80,19 +79,6 @@ public class SuperPeer {
 
                 switch (type) {
                     case "c":
-                        // this record is for consistency model
-                        switch (line[1]) {
-                            case "pull":
-                                this.model = ConsistencyModel.PULL;
-                                break;
-                            case "push":
-                                this.model = ConsistencyModel.PUSH;
-                                break;
-                            default:
-                                this.log(String.format("Consistency model should be 'push' or 'pull', got '%s'. Defaulting to 'push'...", line[1]));
-                                this.model = ConsistencyModel.PUSH;
-                                break;
-                        }
                         break;
                     case "s":
                         // SuperPeer definition: 'other' is neighbor to associate with this SuperPeer
@@ -134,7 +120,7 @@ public class SuperPeer {
                 filePeerList.add(peer);
                 this.registry.put(fileName, filePeerList);
             }
-            this.log(String.format("Registered '%s' to (Leaf %s).", fileName, peer));
+            this.log(String.format("-> registered '%s' to (leaf %s).", fileName, peer));
             return 0;
         } catch (Exception e) {
             e.printStackTrace();
@@ -149,11 +135,11 @@ public class SuperPeer {
             if (this.registry.containsKey(fileName)) {
                 HashSet<IPv4> filePeerList = this.registry.get(fileName);
                 filePeerList.remove(peer);
-                this.log(String.format("Deregistered (Leaf %s) from '%s'.", peer, fileName));
+                this.log(String.format("-> deregistered (Leaf %s) from '%s'.", peer, fileName));
                 if (filePeerList.size() == 0) {
                     // last peer removed from file's peer list, remove file from registry
                     this.registry.remove(fileName);
-                    this.log(String.format("\t-> removing '%s' entirely.", fileName));
+                    this.log(String.format("  -> removing '%s' entirely.", fileName));
                 }
             }
             return 0;
@@ -224,7 +210,7 @@ public class SuperPeer {
 
     /** record - logs message then keeps size in check */
     public SuperPeer record(String messageID, IPv4 peer) {
-        this.log(String.format("New Message -> Recording '%s'...", messageID));
+        this.log(String.format("-> recording new msg '%s'...", messageID));
         this.history.add(messageID);
         this.mappedHistory.put(messageID, peer);
         if (this.history.size() > this.historySize) {
@@ -235,7 +221,7 @@ public class SuperPeer {
         return this;
     }
 
-    /** forward - forwards a Message to Neighbor SuperPeers */
+    /** forward - forwards a Message to all Neighbor SuperPeers */
     public SuperPeer forward(String command, Message message) {
         IPv4 neighbor;
         Socket nSock;
@@ -244,7 +230,7 @@ public class SuperPeer {
         message.decrementTTL().setSender(this.getAddress());
         for (String n : this.neighbors) {
             try {
-                this.log(String.format("Forwarding '%s %s' to (%s)", command, message, n));
+                this.log(String.format("-> Forwarding '%s %s' to (%s)", command, message, n));
                 neighbor = new IPv4(n);
                 // forward the message to each, with the TTL decremented
                 nSock = new Socket(neighbor.getAddress(), neighbor.getPort());
@@ -254,7 +240,7 @@ public class SuperPeer {
                 toNeighbor.writeUTF(String.format("%s %s", command, message));
                 nSock.close();
             } catch (Exception e) {
-                this.log(String.format("Could not connect to (%s). Is it live?", n));
+                this.log(String.format("-> Could not connect to (%s). Is it live?", n));
             }
         }
         return this;
@@ -321,16 +307,56 @@ public class SuperPeer {
                 String[] request = this.fromPeer.readUTF().split("[ \t]+");
                 String command = request[0];
                 Message message = new Message(request[1]);
-                IPv4 sender = message.getSender();
 
-                this.superPeer.log(String.format("Received '%s %s' from %s", command, request[1], sender));
+                this.superPeer.log(String.format("-> received '%s %s' from (%s)", command, message, this.peer));
 
                 switch (command) {
+                    case "invalidate":
+                        if (!this.superPeer.hasSeen(message.getID())) {
+                            // log it and make sure history size is okay
+                            this.superPeer.record(message.getID(), this.peer);
+
+                            // check if this file is in one of our leaf nodes
+                            // handle leaf peers that need this invalidate
+                            if (this.superPeer.hasFile(message.getFileName())) {
+                                try {
+                                    Socket leafSock;
+                                    DataOutputStream toLeaf;
+                                    HashSet<IPv4> leafs = this.superPeer.registry.get(message.getFileName());
+                                    for (IPv4 l : leafs) {
+                                        this.superPeer.log(String.format("-> telling (Leaf %s) to discard '%s'.", l, message.getFileName()));
+
+                                        // open socket to the leaf node
+                                        leafSock = new Socket(l.getAddress(), l.getPort());
+                                        toLeaf = new DataOutputStream(leafSock.getOutputStream());
+
+                                        // handshake
+                                        toLeaf.writeUTF(this.superPeer.toString());
+
+                                        // send invalidate to leaf
+                                        toLeaf.writeUTF(String.format("invalidate %s", message));
+                                        leafSock.close();
+                                    }
+                                    this.superPeer.log(String.format("-> deregistering '%s' entirely.", message.getFileName()));
+                                    this.superPeer.registry.remove(message.getFileName());
+                                } catch (Exception e) {
+                                    this.superPeer.log(String.format("-> connection failed with (leaf %s)", this.peer));
+                                    e.printStackTrace();
+                                }
+                            }
+
+                            // next, forward message to other SuperPeers
+                            if (message.getTTL() > 0) {
+                                message.setSender(this.superPeer.getAddress());
+                                this.superPeer.forward(command, message);
+                            }
+                        }
+                        break;
                     case "query":
                         // only do work if this message has not been seen before
                         if (!this.superPeer.hasSeen(message.getID())) {
                             // log it and make sure history size is okay
-                            this.superPeer.record(message.getID(), sender);
+                            this.superPeer.record(message.getID(), message.getSender());
 
                             // check if this file is in one of our leaf nodes
                             if (this.superPeer.hasFile(message.getFileName())) {
@@ -344,7 +370,7 @@ public class SuperPeer {
 
                                     for (IPv4 l : leafs) {
                                         // send queryhit back to leaf requester, one for each leaf
-                                        this.superPeer.log(String.format("Sending back 'queryhit %s %s' to %s.", message, l, peer));
+                                        this.superPeer.log(String.format("-> sending back 'queryhit' to (%s).", this.peer));
                                         toRequester.writeUTF(String.format("queryhit %s %s", message, l));
                                     }
                                     reqSock.close();
@@ -355,47 +381,29 @@ public class SuperPeer {
 
                             // next, forward message to other SuperPeers
                             if (message.getTTL() > 0) {
-                                message.decrementTTL();
-                                for (String n : this.superPeer.neighbors) {
-                                    try {
-                                        IPv4 neighbor = new IPv4(n);
-                                        if (!neighbor.equals(sender)) {
-                                            // we can save a communication cost by not forwarding this same
-                                            // message back go the SuperPeer who sent it to us
-                                            this.superPeer.log(String.format("Forwarding 'query %s %s' to (%s)", message, this.superPeer, n));
-                                            // forward the message to each, with the TTL decremented
-                                            Socket nSock = new Socket(neighbor.getAddress(), neighbor.getPort());
-                                            DataOutputStream toNeighbor = new DataOutputStream(nSock.getOutputStream());
-                                            toNeighbor.writeUTF(this.superPeer.toString());
-                                            toNeighbor.writeUTF(
-                                                String.format("query %s %s", message, this.superPeer)
-                                            );
-                                            nSock.close();
-                                        }
-                                    } catch (Exception e) {
-                                        this.superPeer.log(String.format("Failed to forward message to (%s)", n));
-                                    }
-                                }
+                                this.superPeer.forward(command, message);
                             }
                         } else {
-                            this.superPeer.log("Messaged already seen -> Dropped.");
+                            this.superPeer.log("-> message already seen. dropping.");
                         }
                         break;
                     case "queryhit":
                         try {
+                            // get the peer who sent this message to us (for backtracking)
                             IPv4 back = this.superPeer.mappedHistory.get(message.getID());
-                            this.superPeer.log(String.format("forwarding back to (%s)", back));
-                            Socket bSock = new Socket(back.getAddress(), back.getPort());
+                            this.superPeer.log(String.format("-> forwarding back to (%s)", back));
+
+                            // open a socket to them
+                            Socket bSock = new Socket(back.getAddress().toString(), back.getPort());
                             DataOutputStream toNeighbor = new DataOutputStream(bSock.getOutputStream());
+
                             // handshake
                             toNeighbor.writeUTF(this.superPeer.toString());
-                            // send queryhit
-                            toNeighbor.writeUTF(
-                                String.format("queryhit %s %s", message, sender)
-                            );
+                            toNeighbor.writeUTF(String.format("%s %s %s", command, message, request[2]));
                             bSock.close();
                         } catch (Exception e) {
-                            this.superPeer.log(String.format("Failed to forward message to (%s)", peer));
+                            this.superPeer.log("-> failed to forward message.");
+                            e.printStackTrace();
                         }
                         break;
                     default:
@@ -410,7 +418,7 @@ public class SuperPeer {
 
         private void handlePeer() {
             try {
-                this.superPeer.log(String.format("Connected with (Peer %s)", this.peer));
+                this.superPeer.log(String.format("-> connected with (leaf %s)", this.peer));
                 while (true) {
                     // connection persists until closed/interrupted
                     String[] request = fromPeer.readUTF().split("[ \t]+");
@@ -436,13 +444,13 @@ public class SuperPeer {
                                     DataOutputStream toRequester = new DataOutputStream(reqSock.getOutputStream());
                                     for (IPv4 l : leafs) {
                                         // send queryhit back to leaf requester, one for each leaf
-                                        this.superPeer.log(String.format("(%s) has '%s'.", l, message.getFileName()));
+                                        this.superPeer.log(String.format("-> (%s) has '%s'. sending 'queryhit' back.", l, message.getFileName()));
                                         toRequester.writeUTF(this.toString());
                                         toRequester.writeUTF(String.format("queryhit %s %s", message, l));
                                     }
                                     reqSock.close();
                                 } catch (Exception e) {
-                                    this.superPeer.log(String.format("Connection failed with (Leaf %s)", this.peer));
+                                    this.superPeer.log(String.format("-> connection failed with (leaf %s)", this.peer));
                                 }
                             }
 
@@ -451,39 +459,20 @@ public class SuperPeer {
 
                             // next, forward message to other SuperPeers
                             if (message.getTTL() > 0) {
-                                message.decrementTTL();
-                                for (String n : this.superPeer.neighbors) {
-                                    try {
-                                        message.setSender(this.superPeer.getAddress());
-                                        this.superPeer.log(String.format("Forwarding 'query %s' to (%s)", message, n));
-                                        IPv4 neighbor = new IPv4(n);
-                                        // forward the message to each, with the TTL decremented
-                                        Socket nSock = new Socket(neighbor.getAddress(), neighbor.getPort());
-                                        DataOutputStream toNeighbor = new DataOutputStream(nSock.getOutputStream());
-                                        // initial handshake
-                                        toNeighbor.writeUTF(this.superPeer.toString());
-                                        toNeighbor.writeUTF(
-                                            String.format("query %s %s", message, this.superPeer)
-                                        );
-                                        nSock.close();
-                                    } catch (Exception e) {
-                                        this.superPeer.log(String.format("Could not connect to (%s). Is it live?", n));
-                                        continue;
-                                    }
-                                }
+                                this.superPeer.forward(command, message);
                             }
                             break;
                         case "invalidate":
                             // handle leaf peers that need this invalidate
                             if (this.superPeer.hasFile(message.getFileName())) {
-                                try {
-                                    Socket leafSock;
-                                    DataOutputStream toLeaf;
-                                    HashSet<IPv4> leafs = this.superPeer.registry.get(message.getFileName());
-                                    for (IPv4 l : leafs) {
+                                Socket leafSock;
+                                DataOutputStream toLeaf;
+                                HashSet<IPv4> leafs = this.superPeer.registry.get(message.getFileName());
+                                for (IPv4 l : leafs) {
+                                    try {
                                         if (l.equals(this.peer)) { continue; }
 
-                                        this.superPeer.log(String.format("debug -> telling (Leaf %s) to discard '%s'.", l, message.getFileName()));
+                                        this.superPeer.log(String.format("-> telling (leaf %s) to discard '%s'.", l, message.getFileName()));
 
                                         // open socket to the leaf node
                                         leafSock = new Socket(l.getAddress(), l.getPort());
@@ -498,9 +487,9 @@ public class SuperPeer {
 
                                         // deregister leaf
                                         this.superPeer.deregister(message.getFileName(), l);
+                                    } catch (Exception e) {
+                                        this.superPeer.log(String.format("-> connection failed with (leaf %s)", l));
                                     }
-                                } catch (Exception e) {
-                                    this.superPeer.log(String.format("Connection failed with (Leaf %s)", this.peer));
                                 }
                             }
 
@@ -509,15 +498,16 @@ public class SuperPeer {
 
                             // next, forward message to other SuperPeers
                             if (message.getTTL() > 0) {
+                                message.setSender(this.superPeer.getAddress());
                                 this.superPeer.forward(command, message);
                             }
                             break;
                         default:
-                            this.superPeer.log(String.format("Unknown command '%s'. Ignoring.", command));
+                            this.superPeer.log(String.format("-> unknown command '%s'. ignoring.", command));
                     }
                 }
             } catch (EOFException e) {
-                this.superPeer.log(String.format("Connection with (%s) closed.", this.peer));
+                this.superPeer.log(String.format("-> connection with (%s) closed.", this.peer));
                 for (String file : this.superPeer.registry.keySet()) {
                     // deregister all its files
                     this.superPeer.deregister(file, this.peer);
