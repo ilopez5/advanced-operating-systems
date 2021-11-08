@@ -522,8 +522,12 @@ public class Peer {
      *                  where a file is created or deleted.
      *                      Creation -> registered with SuperPeer
      *                      Deleted  -> deregistered from the SuperPeer.
+     *
+     *      ConsistencyChecker - pull model only. periodically checks files that
+     *                  are not owned by this peer, given enough time has passed
+     *                  (using the ttr). acts accordingly.
      */
-    public class PeerListener extends Thread {
+    private class PeerListener extends Thread {
         /* reference to the Peer this listener works for */
         private Peer peer;
 

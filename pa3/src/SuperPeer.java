@@ -66,7 +66,6 @@ public class SuperPeer {
      */
     public SuperPeer initialize() {
         try {
-            this.log(String.format("Listening on %s...", this));
             // read config file (e.g., all-to-all.config, linear.config)
             Scanner sc = new Scanner(new FileInputStream(this.config));
 
@@ -155,6 +154,7 @@ public class SuperPeer {
      */
     public SuperPeer listen() {
         try {
+            this.log(String.format("Listening on %s...", this));
             while (true) {
                 // accept an incoming connection
                 Socket peerSocket = this.server.accept();
@@ -176,11 +176,6 @@ public class SuperPeer {
     /** getAddress - returns IPv4 address of this SuperPeer */
     public IPv4 getAddress() {
         return this.address;
-    }
-
-    /** getPort - returns server port of this SuperPeer */
-    public int getPort() {
-        return this.address.getPort();
     }
 
     /** equals - checks equality between this SuperPeer and another one */
