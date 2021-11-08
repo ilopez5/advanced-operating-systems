@@ -1,0 +1,332 @@
+ismael@kraken assignments/pa3/src on  master
+Ω >> java SuperPeer 127.0.0.1:5000 configs/lin.simple.push.config
+[SP 127.0.0.1:5000]: Listening on 127.0.0.1:5000...
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:6001)
+[SP 127.0.0.1:5000]: -> connected with (leaf 127.0.0.1:6001)
+[SP 127.0.0.1:5000]: -> registered 'Moneyball.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'Warrior.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'Megamind.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'Inception.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'AboutTime.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'TheShawshankRedemption.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'Moana.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'Chef.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'Tenet.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: -> registered 'SpaceCowboys.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:6002)
+[SP 127.0.0.1:5000]: -> connected with (leaf 127.0.0.1:6002)
+[SP 127.0.0.1:5000]: -> registered 'Coco.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'FreedomWriters.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'Hypnosis.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'RealSteel.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'MyWay.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'TheLincolnLawyer.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'Old.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'LifeIsBeautiful.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'Up.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> registered 'AirBud.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: -> recording new msg '127.0.0.1:6001-1'...
+[SP 127.0.0.1:5000]: -> Forwarding 'query 127.0.0.1:6001-1;9;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5000' to (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> received 'queryhit 127.0.0.1:6001-1;9;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5000' from (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> forwarding back to (127.0.0.1:6001)
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> received 'query 127.0.0.1:6001-1;8;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5001' from (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> message already seen. dropping.
+[SP 127.0.0.1:5000]: -> registered 'TopGun.mp4' to (leaf 127.0.0.1:6001).
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> received 'query 127.0.0.1:6003-1;9;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5001' from (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> recording new msg '127.0.0.1:6003-1'...
+[SP 127.0.0.1:5000]: -> sending back 'queryhit' to (127.0.0.1:5001).
+[SP 127.0.0.1:5000]: -> Forwarding 'query 127.0.0.1:6003-1;8;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5000' to (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> (127.0.0.1:6001) has 'TopGun.mp4'. sending 'queryhit' back.
+[SP 127.0.0.1:5000]: -> recording new msg '127.0.0.1:6002-1'...
+[SP 127.0.0.1:5000]: -> Forwarding 'query 127.0.0.1:6002-1;9;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5000' to (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> received 'queryhit 127.0.0.1:6002-1;9;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5000' from (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> forwarding back to (127.0.0.1:6002)
+[SP 127.0.0.1:5000]: -> registered 'TopGun.mp4' to (leaf 127.0.0.1:6002).
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> received 'query 127.0.0.1:6002-1;8;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5001' from (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> message already seen. dropping.
+[SP 127.0.0.1:5000]: Handshake with (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> received 'invalidate 127.0.0.1:6004-1;9;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5001' from (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> recording new msg '127.0.0.1:6004-1'...
+[SP 127.0.0.1:5000]: -> telling (Leaf 127.0.0.1:6002) to discard 'TopGun.mp4'.
+[SP 127.0.0.1:5000]: -> telling (Leaf 127.0.0.1:6001) to discard 'TopGun.mp4'.
+[SP 127.0.0.1:5000]: -> deregistering 'TopGun.mp4' entirely.
+[SP 127.0.0.1:5000]: -> Forwarding 'invalidate 127.0.0.1:6004-1;8;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5000' to (127.0.0.1:5001)
+[SP 127.0.0.1:5000]: -> connection with (127.0.0.1:6001) closed.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'FreedomWriters.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'MyWay.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Moana.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Moana.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Warrior.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Warrior.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'AboutTime.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'AboutTime.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Tenet.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Tenet.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Old.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Moneyball.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Moneyball.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'SpaceCowboys.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'SpaceCowboys.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Chef.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Chef.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'TheLincolnLawyer.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'RealSteel.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Inception.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Inception.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Up.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Megamind.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Megamind.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'LifeIsBeautiful.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'TheShawshankRedemption.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'TheShawshankRedemption.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'AirBud.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Coco.mp4'.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6001) from 'Hypnosis.mp4'.
+[SP 127.0.0.1:5000]: -> connection with (127.0.0.1:6002) closed.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'FreedomWriters.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'FreedomWriters.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'MyWay.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'MyWay.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'Old.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Old.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'TheLincolnLawyer.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'TheLincolnLawyer.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'RealSteel.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'RealSteel.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'Up.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Up.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'LifeIsBeautiful.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'LifeIsBeautiful.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'AirBud.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'AirBud.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'Coco.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Coco.mp4' entirely.
+[SP 127.0.0.1:5000]: -> deregistered (Leaf 127.0.0.1:6002) from 'Hypnosis.mp4'.
+[SP 127.0.0.1:5000]:   -> removing 'Hypnosis.mp4' entirely.
+^C⏎
+ismael@kraken assignments/pa3/src on  master took 4m8s
+[130] Ω >>
+
+
+---
+
+
+ismael@kraken assignments/pa3/src on  master
+Ω >> java SuperPeer 127.0.0.1:5001 configs/lin.simple.push.config
+[SP 127.0.0.1:5001]: Listening on 127.0.0.1:5001...
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:6003)
+[SP 127.0.0.1:5001]: -> connected with (leaf 127.0.0.1:6003)
+[SP 127.0.0.1:5001]: -> registered 'LaBamba.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'EuroVision.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'TheGrey.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'Ghost.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'DjangoUnchained.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'TheWolfOfWallStreet.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'ThePrestige.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'ET.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'MadMax.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> registered 'SavingPrivateRyan.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:6004)
+[SP 127.0.0.1:5001]: -> connected with (leaf 127.0.0.1:6004)
+[SP 127.0.0.1:5001]: -> registered 'TheBigShort.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'SherlockHolmes.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'ForrestGump.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'PremiumRush.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'DeadPoetsSociety.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'IAmLegend.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'TopGun.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'GoneGirl.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'TropicThunder.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: -> registered 'TheGreatestShowman.mp4' to (leaf 127.0.0.1:6004).
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> received 'query 127.0.0.1:6001-1;9;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5000' from (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> recording new msg '127.0.0.1:6001-1'...
+[SP 127.0.0.1:5001]: -> sending back 'queryhit' to (127.0.0.1:5000).
+[SP 127.0.0.1:5001]: -> Forwarding 'query 127.0.0.1:6001-1;8;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5001' to (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> Forwarding 'query 127.0.0.1:6001-1;8;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5001' to (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: -> Could not connect to (127.0.0.1:5002). Is it live?
+[SP 127.0.0.1:5001]: -> (127.0.0.1:6004) has 'TopGun.mp4'. sending 'queryhit' back.
+[SP 127.0.0.1:5001]: -> recording new msg '127.0.0.1:6003-1'...
+[SP 127.0.0.1:5001]: -> Forwarding 'query 127.0.0.1:6003-1;9;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5001' to (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> Forwarding 'query 127.0.0.1:6003-1;9;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5001' to (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: -> Could not connect to (127.0.0.1:5002). Is it live?
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> received 'queryhit 127.0.0.1:6003-1;9;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5001' from (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> registered 'TopGun.mp4' to (leaf 127.0.0.1:6003).
+[SP 127.0.0.1:5001]: -> forwarding back to (127.0.0.1:6003)
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> received 'query 127.0.0.1:6003-1;8;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5000' from (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> message already seen. dropping.
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> received 'query 127.0.0.1:6002-1;9;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5000' from (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> recording new msg '127.0.0.1:6002-1'...
+[SP 127.0.0.1:5001]: -> sending back 'queryhit' to (127.0.0.1:5000).
+[SP 127.0.0.1:5001]: -> sending back 'queryhit' to (127.0.0.1:5000).
+[SP 127.0.0.1:5001]: -> Forwarding 'query 127.0.0.1:6002-1;8;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5001' to (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> Forwarding 'query 127.0.0.1:6002-1;8;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5001' to (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: -> Could not connect to (127.0.0.1:5002). Is it live?
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'TopGun.mp4'.
+[SP 127.0.0.1:5001]: -> telling (leaf 127.0.0.1:6003) to discard 'TopGun.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'TopGun.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'TopGun.mp4' entirely.
+[SP 127.0.0.1:5001]: -> recording new msg '127.0.0.1:6004-1'...
+[SP 127.0.0.1:5001]: -> Forwarding 'invalidate 127.0.0.1:6004-1;9;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5001' to (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> Forwarding 'invalidate 127.0.0.1:6004-1;9;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5001' to (127.0.0.1:5002)
+[SP 127.0.0.1:5001]: -> Could not connect to (127.0.0.1:5002). Is it live?
+[SP 127.0.0.1:5001]: Handshake with (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> received 'invalidate 127.0.0.1:6004-1;8;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5000' from (127.0.0.1:5000)
+[SP 127.0.0.1:5001]: -> connection with (127.0.0.1:6003) closed.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'TheGrey.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'TheGrey.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'TheBigShort.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'PremiumRush.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'LaBamba.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'LaBamba.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'DjangoUnchained.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'DjangoUnchained.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'TheWolfOfWallStreet.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'TheWolfOfWallStreet.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'MadMax.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'MadMax.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'IAmLegend.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'ET.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'ET.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'EuroVision.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'EuroVision.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'ThePrestige.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'ThePrestige.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'Ghost.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'Ghost.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'GoneGirl.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'TropicThunder.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'SavingPrivateRyan.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'SavingPrivateRyan.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'ForrestGump.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'DeadPoetsSociety.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'TheGreatestShowman.mp4'.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6003) from 'SherlockHolmes.mp4'.
+[SP 127.0.0.1:5001]: -> connection with (127.0.0.1:6004) closed.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'TheBigShort.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'TheBigShort.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'PremiumRush.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'PremiumRush.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'IAmLegend.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'IAmLegend.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'GoneGirl.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'GoneGirl.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'TropicThunder.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'TropicThunder.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'ForrestGump.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'ForrestGump.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'DeadPoetsSociety.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'DeadPoetsSociety.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'TheGreatestShowman.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'TheGreatestShowman.mp4' entirely.
+[SP 127.0.0.1:5001]: -> deregistered (Leaf 127.0.0.1:6004) from 'SherlockHolmes.mp4'.
+[SP 127.0.0.1:5001]:   -> removing 'SherlockHolmes.mp4' entirely.
+^C⏎
+ismael@kraken assignments/pa3/src on  master took 3m59s
+[130] Ω >>
+
+
+---
+
+
+ismael@kraken assignments/pa3/src on  master
+Ω >> java Peer 127.0.0.1:6001 files/peer6001/ configs/lin.simple.push.config
+[P 127.0.0.1:6001]: Listening on 127.0.0.1:6001...
+(peer-cli) => search TopGun.mp4
+(peer-cli) => [P 127.0.0.1:6001]: Connected with (127.0.0.1:5000)
+[P 127.0.0.1:6001]: received 'queryhit 127.0.0.1:6001-1;9;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5000 127.0.0.1:6004'
+[P 127.0.0.1:6001]: Downloading 'TopGun.mp4' from (127.0.0.1:6004)...
+[P 127.0.0.1:6001]: Download complete. (took 167200 ns)
+
+(peer-cli) => [P 127.0.0.1:6001]: Connected with (127.0.0.1:6002)
+[P 127.0.0.1:6001]: received 'obtain 127.0.0.1:6002-1;10;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:6002'
+[P 127.0.0.1:6001]: Uploading 'TopGun.mp4'
+[P 127.0.0.1:6001]: Connected with (127.0.0.1:5000)
+[P 127.0.0.1:6001]: received 'invalidate 127.0.0.1:6004-1;9;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5001'
+
+(peer-cli) => exit
+[P 127.0.0.1:6001]: Quitting...
+[P 127.0.0.1:6001]: Closing PeerListener...
+[P 127.0.0.1:6001]: Closing Watchdog...
+ismael@kraken assignments/pa3/src on  master took 3m34s
+Ω >>
+
+
+---
+
+
+ismael@kraken assignments/pa3/src on  master
+Ω >> java Peer 127.0.0.1:6003 files/peer6003/ configs/lin.simple.push.config
+[P 127.0.0.1:6003]: Listening on 127.0.0.1:6003...
+(peer-cli) => search TopGun.mp4
+(peer-cli) => [P 127.0.0.1:6003]: Connected with (Thread[Thread-0,5,main])
+[P 127.0.0.1:6003]: received 'queryhit 127.0.0.1:6003-1;10;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:6003 127.0.0.1:6004'
+[P 127.0.0.1:6003]: Downloading 'TopGun.mp4' from (127.0.0.1:6004)...
+[P 127.0.0.1:6003]: Download complete. (took 132200 ns)
+[P 127.0.0.1:6003]: Connected with (127.0.0.1:5001)
+[P 127.0.0.1:6003]: received 'queryhit 127.0.0.1:6003-1;9;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:5001 127.0.0.1:6001'
+
+(peer-cli) => [P 127.0.0.1:6003]: Connected with (127.0.0.1:5001)
+[P 127.0.0.1:6003]: received 'invalidate 127.0.0.1:6004-1;10;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:6004'
+
+(peer-cli) => exit
+[P 127.0.0.1:6003]: Quitting...
+[P 127.0.0.1:6003]: Closing PeerListener...
+[P 127.0.0.1:6003]: Closing Watchdog...
+ismael@kraken assignments/pa3/src on  master took 3m19s
+Ω >>
+
+
+---
+
+
+ismael@kraken assignments/pa3/src on  master
+[130] Ω >> java Peer 127.0.0.1:6002 files/peer6002/ configs/lin.simple.push.config
+[P 127.0.0.1:6002]: Listening on 127.0.0.1:6002...
+(peer-cli) => search TopGun.mp4
+(peer-cli) => [P 127.0.0.1:6002]: Connected with (Thread[Thread-1,5,main])
+[P 127.0.0.1:6002]: received 'queryhit 127.0.0.1:6002-1;10;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:6002 127.0.0.1:6001'
+[P 127.0.0.1:6002]: Downloading 'TopGun.mp4' from (127.0.0.1:6001)...
+[P 127.0.0.1:6002]: Download complete. (took 174200 ns)
+[P 127.0.0.1:6002]: Connected with (127.0.0.1:5000)
+[P 127.0.0.1:6002]: received 'queryhit 127.0.0.1:6002-1;9;TopGun.mp4,127.0.0.1:6002,1;127.0.0.1:5000 127.0.0.1:6004'
+
+(peer-cli) => [P 127.0.0.1:6002]: Connected with (127.0.0.1:5000)
+[P 127.0.0.1:6002]: received 'invalidate 127.0.0.1:6004-1;9;TopGun.mp4,127.0.0.1:6004,1;127.0.0.1:5001'
+
+(peer-cli) => exit
+[P 127.0.0.1:6002]: Quitting...
+[P 127.0.0.1:6002]: Closing PeerListener...
+[P 127.0.0.1:6002]: Closing Watchdog...
+ismael@kraken assignments/pa3/src on  master took 2m45s
+Ω >>
+
+
+---
+
+
+ismael@kraken assignments/pa3/src on  master
+Ω >> java Peer 127.0.0.1:6004 files/peer6004/ configs/lin.simple.push.config
+[P 127.0.0.1:6004]: Listening on 127.0.0.1:6004...
+(peer-cli) => [P 127.0.0.1:6004]: Connected with (127.0.0.1:6001)
+[P 127.0.0.1:6004]: received 'obtain 127.0.0.1:6001-1;9;TopGun.mp4,127.0.0.1:6001,1;127.0.0.1:5000'
+[P 127.0.0.1:6004]: Uploading 'TopGun.mp4'
+[P 127.0.0.1:6004]: Connected with (127.0.0.1:6003)
+[P 127.0.0.1:6004]: received 'obtain 127.0.0.1:6003-1;10;TopGun.mp4,127.0.0.1:6003,1;127.0.0.1:6003'
+[P 127.0.0.1:6004]: Uploading 'TopGun.mp4'
+
+(peer-cli) => deregister TopGun.mp4
+(peer-cli) => exit
+[P 127.0.0.1:6004]: Quitting...
+[P 127.0.0.1:6004]: Closing PeerListener...
+[P 127.0.0.1:6004]: Closing Watchdog...
+ismael@kraken assignments/pa3/src on  master took 2m19s
+Ω >>
