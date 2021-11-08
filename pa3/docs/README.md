@@ -35,7 +35,7 @@ $ make clean # cleans the auxiliary files
 ```
 
 Screenshot:
-![make](#)
+![make](screenshots/make.png)
 
 ---
 
@@ -72,7 +72,7 @@ $ java SuperPeer 127.0.0.1:5000 configs/lin.full.push.config
 ```
 
 Screenshot:
-![sp](#)
+![sp](screenshots/sp.png)
 
 ### Launching Peers
 To launch a Peer, or leaf peer, run the program while passing in similar arguments
@@ -86,7 +86,7 @@ $ java Peer 127.0.0.1:6001 files/peer6001 configs/lin.full.push.config
 ```
 
 Screenshot:
-![p](#)
+![p](screenshots/p.png)
 
 ## Things you should know
 - If the files/peer60XX directory does not have nested `owned/` and `downloads/`
